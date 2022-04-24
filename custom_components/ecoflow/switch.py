@@ -98,6 +98,7 @@ class SilenceEntity(BaseOutputEntity):
 
 class XboostEntity(BaseOutputEntity):
     _attr_device_class = SwitchDeviceClass.SWITCH
+    _attr_entity_category = EntityCategory.CONFIG
     _key = "xboost"
     _mod = "inv"
     _name = "AC X-Boost"
