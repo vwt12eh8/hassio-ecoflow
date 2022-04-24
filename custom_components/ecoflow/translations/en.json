@@ -1,0 +1,16 @@
+{
+  "title": "EcoFlow",
+  "config": {
+    "abort": {},
+    "error": {
+      "timeout": "Connection timeouted"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "host": "Hostname or IP-address"
+        }
+      }
+    }
+  }
+}
