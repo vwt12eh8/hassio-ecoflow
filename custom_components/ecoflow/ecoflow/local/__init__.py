@@ -28,7 +28,8 @@ def parse_cmd(data: bytes):
     if data[1] != 2:
         # TODO
         return
-    args = data[16:16+int.from_bytes(data[2:4], "little")]
-    args = bytes(v ^ data[6] for v in args)
+    args = data[16:16 + int.from_bytes(data[2:4], "little")]
+    if data[8] != 0:
+        args = bytes(v ^ data[6] for v in args)
 
     return ((data[12], data[14], data[15]), args)

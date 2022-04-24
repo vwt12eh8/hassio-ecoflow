@@ -81,7 +81,8 @@ class EcoFlowLocalClient:
                     continue
                 for f in [*self.__listeners.values(), self.received_handler]:
                     try:
-                        f(*rcv)
+                        if f:
+                            f(*rcv)
                     except Exception as ex:
                         self.logger.exception(ex)
             if connected and self.disconnected_handler:

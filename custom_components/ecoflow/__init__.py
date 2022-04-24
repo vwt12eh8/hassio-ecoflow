@@ -132,7 +132,10 @@ class HassioEcoFlowClient:
     def __connected(self):
         async def f():
             for cmd in self.coordinators:
-                await self.coordinators[cmd].async_refresh()
+                try:
+                    await self.coordinators[cmd].async_refresh()
+                except:
+                    pass
         create_task(f())
 
     def __connected_extra(self):
