@@ -12,7 +12,7 @@ class EcoFlowLocalClient:
     received_handler: Callable[[tuple[int, int, int], bytes], None] = None
     __tx = None
 
-    def __init__(self, host: str, logger: Logger, timeout=10):
+    def __init__(self, host: str, logger: Logger, timeout=15):
         self.host = host
         self.logger = logger
         self.timeout = timeout
@@ -66,7 +66,10 @@ class EcoFlowLocalClient:
     async def __run(self):
         connected = False
         while True:
-            (rx, tx) = await open_connection(self.host, 8055)
+            try:
+                (rx, tx) = await open_connection(self.host, 8055)
+            except:
+                continue
             self.__tx.set_result(tx)
             while not rx.at_eof():
                 try:
