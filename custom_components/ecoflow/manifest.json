@@ -10,7 +10,7 @@
   ],
   "dhcp": [
     {
-      "hostname": "EcoFlow_*",
+      "hostname": "ecoflow_*",
       "macaddress": "70039F*"
     }
   ],

@@ -16,7 +16,7 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     host = None
 
-    async def _get_sn_main(self, host: str):
+    async def _get_sn_main(self):
         client = EcoFlowLocalClient(self.host, _LOGGER)
         client.run()
         try:
@@ -25,13 +25,13 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
             await client.close()
         await self.async_set_unique_id(info["serial"])
         self._abort_if_unique_id_configured(updates={
-            CONF_HOST: host,
+            CONF_HOST: self.host,
         })
         return info
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
-        await self._get_sn_main(discovery_info.ip)
         self.host = discovery_info.ip
+        await self._get_sn_main()
         return self.async_show_form(step_id="user")
 
     async def async_step_user(self, user_input: dict = None):
@@ -39,9 +39,9 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
             self.host = user_input.get(CONF_HOST)
 
         errors = {}
-        if self.host:
+        if self.host and user_input is not None:
             try:
-                info = await self._get_sn_main(self.host)
+                info = await self._get_sn_main()
             except TimeoutError:
                 errors["base"] = "timeout"
             else:
