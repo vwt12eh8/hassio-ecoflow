@@ -176,12 +176,12 @@ def set_chg_pause(value: int):
     return build2(4, 32, 69, bytes([255, 255, 255, 255, value]))
 
 
-def set_dc_input_current(product: int, value: int):
+def set_dc_in_current(product: int, value: int):
     dst = 5 if 12 < product < 16 else 4
     return build2(dst, 32, 71, value.to_bytes(4, "little"))
 
 
-def get_dc_input_current(product: int):
+def get_dc_in_current(product: int):
     dst = 5 if 12 < product < 16 else 4
     return build2(dst, 32, 72)
 

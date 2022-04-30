@@ -283,7 +283,7 @@ def sn(d: bytes, product: int = None):
     ]))
 
 
-def dc_input_current(d: bytes, product: int = None):
+def dc_in_current(d: bytes, product: int = None):
     return int.from_bytes(d, "little")
 
 
