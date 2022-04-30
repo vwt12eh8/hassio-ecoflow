@@ -16,17 +16,17 @@ from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
+    entities = [
         BmsLevelEntity(client, "bms_main"),
         LevelEntity(client),
 
         WattsEntity(client, "inv", "in_watts", "input"),
         WattsEntity(client, "inv", "ac_out_watts", "AC output"),
         WattsEntity(client, "pd", "dc_out_watts", "DC output"),
-        WattsEntity(client, "pd", "typec_watts", "Type-C output"),
+        WattsEntity(client, "pd", "typec1_watts", "Type-C1 output"),
         WattsEntity(client, "pd", "usb1_watts", "USB1 output"),
         WattsEntity(client, "pd", "usb2_watts", "USB2 output"),
-        WattsEntity(client, "pd", "usbqc_watts", "USB QC output"),
+        WattsEntity(client, "pd", "usbqc1_watts", "USB-QC1 output"),
         WattsEntity(client, "pd", "led_watts", "light output"),
 
         FanStateEntity(client, "inv", "fan_state", "fan speed"),
@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         TempEntity(client, "inv", "ac_in_temp", "AC input temperature"),
         TempEntity(client, "inv", "ac_out_temp", "AC output temperature"),
         TempEntity(client, "pd", "dc_out_temp", "DC temperature"),
-        TempEntity(client, "pd", "typec_temp", "Type-C temperature"),
+        TempEntity(client, "pd", "typec1_temp", "Type-C1 temperature"),
         TempEntity(client, "bms_main", "temp", "battery temperature"),
 
         VolEntity(client, "inv", "ac_in_vol", "AC input voltage"),
@@ -67,7 +67,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         UsedTimeEntity(client, "pd", "typec_used_time", "Type-C output used"),
         UsedTimeEntity(client, "pd", "usb_used_time", "USB output used"),
         UsedTimeEntity(client, "pd", "usbqc_used_time", "USB QC output used"),
-    ])
+    ]
+    if 12 < client.product < 15:  # DELTA Max/Pro
+        entities.extend([
+            WattsEntity(client, "pd", "typec2_watts", "Type-C2 output"),
+            TempEntity(client, "pd", "typec2_temp", "Type-C2 temperature"),
+            WattsEntity(client, "pd", "usbqc2_watts", "USB-QC2 output"),
+        ])
+    async_add_entities(entities)
 
     extras = set[str]()
 
