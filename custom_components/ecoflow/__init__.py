@@ -182,7 +182,8 @@ class HassioEcoFlowClient:
     def __received(self, cmd: tuple[int, int, int], args: bytes):
         if cmd in self.coordinators:
             self.coordinators[cmd].async_pushed_args(args)
-        create_task(self.pd.async_request_refresh())
+        if cmd != command.pd:
+            create_task(self.pd.async_request_refresh())
 
 
 class EcoFlowEntity(Generic[_T], CoordinatorEntity[DataPushCoordinator[_T]]):

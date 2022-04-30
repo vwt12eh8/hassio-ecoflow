@@ -151,7 +151,7 @@ class EnergySumEntity(EcoFlowEntity[dict], SensorEntity):
     @property
     def extra_state_attributes(self):
         data = self.coordinator.data
-        return {self._keys[i]: data.get(i, None) for i in self._keys}
+        return {self._keys[i]: data[i] for i in self._keys if i in data}
 
     @property
     def native_value(self):
