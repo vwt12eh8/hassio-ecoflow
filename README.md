@@ -9,6 +9,9 @@ Future device updates may prevent integration.
 ## Tested products
 - [x] RIVER Max
 - [x] RIVER Pro + Extra Battery
+- [ ] DELTA Mini
+- [ ] DELTA Max
+- [ ] DELTA Pro
 
 ## How to register for the Energy Dashboard
 - MPPT total input : Solar Panels -> Solar production energy

@@ -39,8 +39,31 @@ def bms_main(d: bytes, product: int):
 
 
 def bms_main_delta(d: bytes):
-    # TODO
-    return {}
+    return _parse_dict(d, [
+        ("chg_state", 1, _to_int),
+        ("chg_cmd", 1, _to_int),
+        ("dsg_cmd", 1, _to_int),
+        ("chg_vol", 4, _to_int),
+        ("chg_amp", 4, _to_int),
+        ("fan_level", 1, _to_int),
+        ("max_chg_soc", 1, _to_int),
+        ("model", 1, _to_int),
+        ("soc", 1, _to_int),
+        ("open_ups_flag", 1, _to_int),
+        ("warning", 1, _to_int),
+        ("chg_remain_time", 4, _to_int),
+        ("dsg_remain_time", 4, _to_int),
+        ("is_normal_flag", 1, _to_int),
+        ("soc_f32", 4, _to_int),
+        ("is_connect", 3, _to_int),
+        ("max_available_num", 1, _to_int),
+        ("open_bms_idx", 1, _to_int),
+        ("para_vol_min", 4, _to_int),
+        ("para_vol_max", 4, _to_int),
+        ("min_dsg_soc", 1, _to_int),
+        ("open_oil_eb_soc", 1, _to_int),
+        ("close_oil_eb_soc", 1, _to_int),
+    ])
 
 
 def bms_main_river(d: bytes):
@@ -121,8 +144,34 @@ def inv(d: bytes, product: int):
 
 
 def inv_delta(d: bytes):
-    # TODO
-    return {}
+    return _parse_dict(d, [
+        ("error_code", 4, _to_int),
+        ("sys_ver", 4, _to_ver_reversed),
+        ("chg_type", 1, _to_int),
+        ("in_watts", 2, _to_int),
+        ("ac_out_watts", 2, _to_int),
+        ("inv_type", 1, _to_int),
+        ("ac_out_vol", 4, _to_int),
+        ("ac_out_amp", 4, _to_int),
+        ("ac_out_freq", 1, _to_int),
+        ("ac_in_vol", 4, _to_int),
+        ("ac_in_amp", 4, _to_int),
+        ("ac_in_freq", 1, _to_int),
+        ("ac_out_temp", 1, _to_int),
+        ("dc_in_vol", 4, _to_int),
+        ("dc_in_amp", 4, _to_int),
+        ("ac_in_temp", 1, _to_int),
+        ("fan_state", 1, _to_int),
+        ("ac_out", 1, _to_int),
+        ("xboost", 1, _to_int),
+        ("cfg_ac_out_vol", 4, _to_int),
+        ("cfg_ac_out_freq", 1, _to_int),
+        ("silence_charge", 1, _to_int),
+        ("cfg_pause_flag", 1, _to_int),
+        ("ac_dipsw", 1, _to_int),
+        ("cfg_fast_chg_watts", 2, _to_int),
+        ("cfg_slow_chg_watts", 2, _to_int),
+    ])
 
 
 def inv_river(d: bytes):
@@ -167,8 +216,46 @@ def pd(d: bytes, product: int):
 
 
 def pd_delta(d: bytes):
-    # TODO
-    return {}
+    return _parse_dict(d, [
+        ("model", 1, _to_int),
+        ("error_code", 4, _to_int),
+        ("sys_ver", 4, _to_ver_reversed),
+        ("wifi_ver", 4, _to_ver_reversed),
+        ("wifi_auto_recovery", 1, _to_int),
+        ("soc_sum", 1, _to_int),
+        ("watts_out_sum", 2, _to_int),
+        ("watts_in_sum", 2, _to_int),
+        ("remain_time", 4, _to_int),
+        ("beep", 1, _to_int),
+        ("anderson_out", 1, _to_int),
+        ("usb1_watts", 1, _to_int),
+        ("usb2_watts", 1, _to_int),
+        ("usbqc1_watts", 1, _to_int),
+        ("usbqc2_watts", 1, _to_int),
+        ("typec1_watts", 1, _to_int),
+        ("typec2_watts", 1, _to_int),
+        ("typec1_temp", 1, _to_int),
+        ("typec2_temp", 1, _to_int),
+        ("dc_out", 1, _to_int),
+        ("dc_out_watts", 1, _to_int),
+        ("dc_out_temp", 1, _to_int),
+        ("standby_min", 2, _to_int),
+        ("lcd_sec", 2, _to_int),
+        ("lcd_brightness", 1, _to_int),
+        ("chg_power_dc", 4, _to_int),
+        ("chg_power_mppt", 4, _to_int),
+        ("chg_power_ac", 4, _to_int),
+        ("dsg_power_dc", 4, _to_int),
+        ("dsg_power_ac", 4, _to_int),
+        ("usb_used_time", 4, _to_int),
+        ("typec_used_time", 4, _to_int),
+        ("dc_out_used_time", 4, _to_int),
+        ("ac_out_used_time", 4, _to_int),
+        ("dc_in_used_time", 4, _to_int),
+        ("mppt_used_time", 4, _to_int),
+        (None, 8, None),
+        ("sys_chg_flag", 1, _to_int),
+    ])
 
 
 def pd_river(d: bytes):
