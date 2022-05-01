@@ -127,10 +127,14 @@ def bms_extra_delta(d: bytes):
 
 
 def dc_in_mode(d: bytes, product: int = None):
+    if len(d) < 2:
+        return None
     return d[1]
 
 
 def fan_auto(d: bytes, product: int = None):
+    if len(d) < 1:
+        return None
     return d[0] == 1
 
 
