@@ -22,8 +22,11 @@ class EcoFlowLocalClient:
     async def close(self):
         if self.__tx.done():
             tx = self.__tx.result()
-            tx.close()
-            await tx.wait_closed()
+            try:
+                tx.close()
+                await tx.wait_closed()
+            except:
+                pass
 
     async def request(self, data: bytes):
         future = Future[bytes]()
@@ -94,5 +97,8 @@ class EcoFlowLocalClient:
             if tx.is_closing():
                 break
             self.__tx = Future[StreamWriter]()
-            tx.close()
-            await tx.wait_closed()
+            try:
+                tx.close()
+                await tx.wait_closed()
+            except:
+                pass
