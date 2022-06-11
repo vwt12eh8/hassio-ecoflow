@@ -1,9 +1,9 @@
-from asyncio import (Future, StreamWriter, create_task, open_connection,
-                     shield, sleep, wait_for)
+from asyncio import (Future, StreamReader, StreamWriter, create_task,
+                     open_connection, shield, sleep, wait_for)
 from logging import Logger
 from typing import Callable
 
-from . import parse_cmd
+from . import parse_cmd, send
 
 
 class EcoFlowLocalClient:
@@ -66,6 +66,16 @@ class EcoFlowLocalClient:
         tx.write(data)
         await tx.drain()
 
+    async def __receive(self, rx: StreamReader):
+        try:
+            data = await wait_for(rx.read(1024), self.timeout)
+        except Exception:
+            await self.send(send.get_sn_main())
+            data = await wait_for(rx.read(1024), 5)
+        if len(data) == 0:
+            raise Exception()
+        return data
+
     async def __run(self):
         connected = False
         while True:
@@ -76,7 +86,7 @@ class EcoFlowLocalClient:
             self.__tx.set_result(tx)
             while not rx.at_eof():
                 try:
-                    data = await wait_for(rx.read(1024), self.timeout)
+                    data = await self.__receive(rx)
                 except Exception:
                     break
                 if not connected and self.connected_handler:
