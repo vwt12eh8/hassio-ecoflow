@@ -3,8 +3,10 @@ from logging import getLogger
 from typing import Callable, Generic, TypeVar
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+from homeassistant.helpers.device_registry import async_get as async_get_dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import (CoordinatorEntity,
                                                       DataUpdateCoordinator)
@@ -70,6 +72,7 @@ class HassioEcoFlowClient:
         self.client = EcoFlowLocalClient(entry.data[CONF_HOST], _LOGGER)
         self.product: int = entry.data[CONF_PRODUCT]
         self.serial = entry.unique_id
+        dr = async_get_dr(hass)
 
         self.device_info_main = DeviceInfo(
             identifiers={(DOMAIN, self.serial)},
@@ -77,6 +80,10 @@ class HassioEcoFlowClient:
             model=PRODUCTS.get(self.product, None),
             name=entry.title,
         )
+        if CONF_MAC in entry.data:
+            self.device_info_main["connections"] = {
+                (CONNECTION_NETWORK_MAC, entry.data[CONF_MAC]),
+            }
 
         self.pd = DataPushCoordinator[dict](
             hass, entry, "pd", self.client, send.get_pd(), receive.pd)
@@ -107,6 +114,10 @@ class HassioEcoFlowClient:
         def pd_updated():
             if "sys_ver" in self.pd.data:
                 self.device_info_main["sw_version"] = self.pd.data["sys_ver"]
+                dr.async_get_or_create(
+                    config_entry_id=entry.entry_id,
+                    **self.device_info_main,
+                )
             if self.__extra_connected != has_extra(self.product, self.pd.data.get("model", None)):
                 self.__extra_connected = not self.__extra_connected
                 if self.__extra_connected:
