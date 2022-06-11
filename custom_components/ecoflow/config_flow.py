@@ -3,7 +3,7 @@ from logging import getLogger
 import voluptuous as vol
 from homeassistant.components.dhcp import DhcpServiceInfo
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, CONF_MAC
 
 from . import DOMAIN
 from .ecoflow.local import PRODUCTS, receive, send
@@ -16,7 +16,7 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     host = None
 
-    async def _get_sn_main(self):
+    async def _get_sn_main(self, mac: str = None):
         client = EcoFlowLocalClient(self.host, _LOGGER)
         client.run()
         try:
@@ -26,12 +26,13 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(info["serial"])
         self._abort_if_unique_id_configured(updates={
             CONF_HOST: self.host,
+            CONF_MAC: mac,
         })
         return info
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
         self.host = discovery_info.ip
-        await self._get_sn_main()
+        await self._get_sn_main(discovery_info.macaddress)
         return self.async_show_form(step_id="user")
 
     async def async_step_user(self, user_input: dict = None):
