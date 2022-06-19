@@ -4,6 +4,9 @@
   "version": "2.0",
   "documentation": "https://github.com/vwt12eh8/hassio-ecoflow",
   "issue_tracker": "https://github.com/vwt12eh8/hassio-ecoflow/issues",
+  "requirements": [
+    "reactivex"
+  ],
   "config_flow": true,
   "codeowners": [
     "@vwt12eh8"
@@ -11,7 +14,7 @@
   "dhcp": [
     {
       "hostname": "ecoflow_*",
-      "macaddress": "70039F*"
+      "macaddress": "*"
     }
   ],
   "iot_class": "local_push"

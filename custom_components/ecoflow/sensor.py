@@ -1,296 +1,182 @@
-from datetime import timedelta
-from typing import Callable
+from typing import Any, Callable
 
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
                                              SensorStateClass)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (ELECTRIC_CURRENT_MILLIAMPERE,
-                                 ELECTRIC_POTENTIAL_MILLIVOLT,
-                                 ENERGY_WATT_HOUR, FREQUENCY_HERTZ, PERCENTAGE,
-                                 POWER_WATT, TEMP_CELSIUS)
+from homeassistant.const import (ELECTRIC_POTENTIAL_VOLT, ENERGY_WATT_HOUR,
+                                 PERCENTAGE, POWER_WATT, TEMP_CELSIUS)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 
 from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient
+from .ecoflow import is_delta, is_power_station, is_river
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
-    entities = [
-        BmsLevelEntity(client, "bms_main"),
-        LevelEntity(client),
+    entities = []
 
-        WattsEntity(client, "inv", "in_watts", "input"),
-        WattsEntity(client, "inv", "ac_out_watts", "AC output"),
-        WattsEntity(client, "pd", "dc_out_watts", "DC output"),
-        WattsEntity(client, "pd", "typec1_watts", "Type-C1 output"),
-        WattsEntity(client, "pd", "usb1_watts", "USB1 output"),
-        WattsEntity(client, "pd", "usb2_watts", "USB2 output"),
-        WattsEntity(client, "pd", "usbqc1_watts", "USB-QC1 output"),
-        WattsEntity(client, "pd", "led_watts", "light output"),
-
-        FanStateEntity(client, "inv", "fan_state", "fan speed"),
-
-        TempEntity(client, "inv", "ac_in_temp", "AC input temperature"),
-        TempEntity(client, "inv", "ac_out_temp", "AC output temperature"),
-        TempEntity(client, "pd", "dc_out_temp", "DC temperature"),
-        TempEntity(client, "pd", "typec1_temp", "Type-C1 temperature"),
-        TempEntity(client, "bms_main", "temp", "battery temperature"),
-
-        VolEntity(client, "inv", "ac_in_vol", "AC input voltage"),
-        VolEntity(client, "inv", "ac_out_vol", "AC output voltage"),
-        VolEntity(client, "bms_main", "vol", "battery voltage"),
-
-        AmpEntity(client, "inv", "ac_in_amp", "AC input current"),
-        AmpEntity(client, "inv", "ac_out_amp", "AC output current"),
-
-        FreqEntity(client, "inv", "ac_out_freq", "AC output frequency"),
-        FreqEntity(client, "inv", "ac_in_freq", "AC input frequency"),
-
-        EnergyEntity(client, "pd", "chg_power_mppt", "MPPT total input"),
-        EnergySumEntity(client, "pd", "chg_sum", "total charged", {
-            "chg_power_dc": "dc",
-            "chg_power_mppt": "mppt",
-            "chg_power_ac": "ac",
-        }),
-        EnergySumEntity(client, "pd", "dsg_sum", "total discharged", {
-            "dsg_power_dc": "dc",
-            "dsg_power_ac": "ac",
-        }),
-
-        BmsCycleEntity(client, "bms_main"),
-
-        UsedTimeEntity(client, "pd", "ac_out_used_time", "AC output used"),
-        UsedTimeEntity(client, "pd", "dc_in_used_time", "DC input used"),
-        UsedTimeEntity(client, "pd", "mppt_used_time", "MPPT input used"),
-        UsedTimeEntity(client, "pd", "dc_out_used_time", "DC output used"),
-        UsedTimeEntity(client, "pd", "typec_used_time", "Type-C output used"),
-        UsedTimeEntity(client, "pd", "usb_used_time", "USB output used"),
-        UsedTimeEntity(client, "pd", "usbqc_used_time", "USB QC output used"),
-    ]
-    if 12 < client.product < 15:  # DELTA Max/Pro
+    if is_power_station(client.product):
         entities.extend([
-            WattsEntity(client, "pd", "typec2_watts", "Type-C2 output"),
-            TempEntity(client, "pd", "typec2_temp", "Type-C2 temperature"),
-            WattsEntity(client, "pd", "usbqc2_watts", "USB-QC2 output"),
+            EnergyEntity(client, client.pd, "mppt_in_energy",
+                         "MPPT total charged"),
+            EnergySumEntity(client, "in_energy", [
+                            "ac", "car", "mppt"], "Total charged"),
+            EnergySumEntity(client, "out_energy", [
+                            "ac", "car"], "Total discharged"),
+            FanEntity(client, client.inverter, "fan_state", "Fan"),
+            RemainTimeEntity(client, client.pd,
+                             "remain_display", "Remain time"),
+            TotalLevelEntity(client, client.pd, "battery_level",
+                             "Total battery level"),
+            UsedTimeEntity(client, client.pd, "ac_out_time",
+                           "AC output used time"),
+            UsedTimeEntity(client, client.pd, "car_in_time",
+                           "DC input used time"),
+            UsedTimeEntity(client, client.pd, "car_out_time",
+                           "DC output used time"),
+            UsedTimeEntity(client, client.pd,
+                           "mppt_time", "MPPT used time"),
+            UsedTimeEntity(client, client.pd, "typec_time",
+                           "USB-C used time"),
+            UsedTimeEntity(client, client.pd,
+                           "usb_time", "USB used time"),
+            WattsEntity(client, client.pd, "in_power", "Total input"),
+            WattsEntity(client, client.pd, "out_power", "Total output"),
+            WattsEntity(client, client.pd, "usb_out1_power",
+                        "USB-A left output"),
+            WattsEntity(client, client.pd, "usb_out2_power",
+                        "USB-A right output"),
         ])
+        if is_delta(client.product):
+            entities.extend([
+                LevelEntity(client, client.ems, "battery_main_level_f32",
+                            "Main battery level"),
+                TempEntity(client, client.pd, "typec_out1_temp",
+                           "USB-C left temperature"),
+                TempEntity(client, client.pd, "typec_out2_temp",
+                           "USB-C right temperature"),
+                UsedTimeEntity(client, client.pd, "ac_in_time",
+                               "AC input used time"),
+                VoltageEntity(client, client.mppt, "dc_in_voltage",
+                              "DC input voltage"),
+                WattsEntity(client, client.inverter,
+                            "ac_in_power", "AC input"),
+                WattsEntity(client, client.mppt, "dc_in_power", "DC input"),
+                WattsEntity(client, client.pd, "usbqc_out1_power",
+                            "USB-FC left output"),
+                WattsEntity(client, client.pd, "usbqc_out2_power",
+                            "USB-FC right output"),
+                WattsEntity(client, client.pd, "typec_out1_power",
+                            "USB-C left output"),
+                WattsEntity(client, client.pd, "typec_out2_power",
+                            "USB-C right output"),
+            ])
+        if is_river(client.product):
+            entities.extend([
+                LevelEntity(client, client.ems, "battery_main_level",
+                            "Main battery level"),
+                TempEntity(client, client.pd, "typec_out1_temp",
+                           "USB-C temperature"),
+                VoltageEntity(client, client.inverter, "dc_in_voltage",
+                              "DC input voltage"),
+                WattsEntity(client, client.pd, "usbqc_out1_power",
+                            "USB-FC output"),
+                WattsEntity(client, client.pd, "typec_out1_power",
+                            "USB-C output"),
+            ])
+
     async_add_entities(entities)
 
-    extras = set[str]()
 
-    def extra_updated():
-        if client.serial_extra is None:
-            return
-        if client.serial_extra in extras:
-            return
-        extras.add(client.serial_extra)
-        async_add_entities([
-            BmsLevelEntity(client, "bms_extra"),
-            TempEntity(client, "bms_extra", "temp", "battery temperature"),
-            VolEntity(client, "bms_extra", "vol", "battery voltage"),
-            BmsCycleEntity(client, "bms_extra"),
-        ])
-    entry.async_on_unload(client.bms_extra.async_add_listener(extra_updated))
+class BaseEntity(SensorEntity, EcoFlowEntity):
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_native_value = data[self._key]
 
 
-class AmpEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_device_class = SensorDeviceClass.CURRENT
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_entity_registry_enabled_default = False
-    _attr_native_unit_of_measurement = ELECTRIC_CURRENT_MILLIAMPERE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
-
-
-class BmsCycleEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:battery-heart-outline"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-    def __init__(self, client: HassioEcoFlowClient, module: str):
-        super().__init__(client, module)
-        self._attr_name += " battery cycles"
-        self._attr_unique_id += "-bms-cycles"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get("cycles", None)
-
-
-class EnergyEntity(EcoFlowEntity[dict], SensorEntity):
+class EnergyEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = ENERGY_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
 
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
-
-
-class EnergySumEntity(EcoFlowEntity[dict], SensorEntity):
+class EnergySumEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = ENERGY_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str, keys: dict[str]):
-        super().__init__(client, module)
-        self._keys = keys
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
+    def __init__(self, client: HassioEcoFlowClient, key: str, keys: list[str], name: str):
+        super().__init__(client, client.pd, key, name)
+        self._suffix_len = len(key) + 1
+        self._keys = [f"{x}_{key}" for x in keys]
 
-    @property
-    def extra_state_attributes(self):
-        data = self.coordinator.data
-        return {self._keys[i]: data[i] for i in self._keys if i in data}
-
-    @property
-    def native_value(self):
-        return sum(self.extra_state_attributes.values())
+    def _on_updated(self, data: dict[str, Any]):
+        values = {key[:-self._suffix_len]: data[key]
+                  for key in data if key in self._keys}
+        self._attr_extra_state_attributes = values
+        self._attr_native_value = sum(values.values())
 
 
-class FanStateEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:fan"
-
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
-
-
-class FreqEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_device_class = SensorDeviceClass.FREQUENCY
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_entity_registry_enabled_default = False
-    _attr_native_unit_of_measurement = FREQUENCY_HERTZ
+class FanEntity(BaseEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
     @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
+    def icon(self):
+        value = self.native_value
+        if value is None or self.native_value <= 0:
+            return "mdi:fan-off"
+        return "mdi:fan"
 
 
-class LevelEntity(EcoFlowEntity[dict], SensorEntity):
+class LevelEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client, "pd")
-        self._attr_name += " total battery level"
-        self._attr_unique_id += "-pd-soc"
 
-    @property
-    def native_value(self):
-        return self.coordinator.data.get("soc_sum", None)
+class RemainTimeEntity(BaseEntity):
+    _attr_icon = "mdi:timer-sand"
 
 
-class BmsLevelEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_device_class = SensorDeviceClass.BATTERY
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, client: HassioEcoFlowClient, module: str):
-        super().__init__(client, module)
-        self._attr_name += " battery level"
-        self._attr_unique_id += "-bms-soc"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get("soc", None)
-
-
-class TempEntity(EcoFlowEntity[dict], SensorEntity):
+class TempEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = TEMP_CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
 
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
+class TotalLevelEntity(LevelEntity):
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self._subscribe(self._client.ems, self.__ems_updated)
+
+    def __ems_updated(self, data: dict[str, Any]):
+        self._attr_extra_state_attributes = {
+            "level_max": data["battery_level_max"],
+        }
+        if self._client.product == 14:
+            self._attr_extra_state_attributes.update({
+                "level_min": data["battery_level_min"],
+                "generator_start": data["generator_level_start"],
+                "generator_stop": data["generator_level_stop"],
+            })
+        self.async_write_ha_state()
 
 
-class UsedTimeEntity(EcoFlowEntity[dict], SensorEntity):
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+class UsedTimeEntity(BaseEntity):
     _attr_icon = "mdi:history"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
-    @property
-    def native_value(self):
-        return timedelta(seconds=self.coordinator.data.get(self._key, 0))
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
-class VolEntity(EcoFlowEntity[dict], SensorEntity):
+class VoltageEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_entity_registry_enabled_default = False
-    _attr_native_unit_of_measurement = ELECTRIC_POTENTIAL_MILLIVOLT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)
+    _attr_native_unit_of_measurement = ELECTRIC_POTENTIAL_VOLT
 
 
-class WattsEntity(EcoFlowEntity[dict], SensorEntity):
+class WattsEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = POWER_WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, client: HassioEcoFlowClient, module: str, key: str, name: str):
-        super().__init__(client, module)
-        self._key = key
-        self._attr_name += " " + name
-        self._attr_unique_id += f"-{module}-{key}"
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get(self._key, None)

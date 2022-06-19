@@ -1,13 +1,13 @@
 {
   "name": "EcoFlow",
   "domains": [
+    "binary_sensor",
     "light",
     "number",
-    "select",
     "sensor",
     "switch"
   ],
-  "homeassistant": "2022.4.0",
+  "homeassistant": "2022.6.0",
   "iot_class": [
     "Local Push"
   ]

@@ -1,7 +1,9 @@
 {
   "title": "EcoFlow",
   "config": {
-    "abort": {},
+    "abort": {
+      "product_unsupported": "Sorry, This product is not supported now."
+    },
     "error": {
       "timeout": "Connection timeouted"
     },

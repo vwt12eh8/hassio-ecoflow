@@ -7,11 +7,15 @@ This integration uses a private API.
 Future device updates may prevent integration.
 
 ## Tested products
-- [x] RIVER Max
-- [x] RIVER Pro + Extra Battery
+- [ ] RIVER Mini (Not impl)
+- [ ] RIVER Max
+- [x] RIVER Pro
+  - [ ] Extra Battery
 - [ ] DELTA Mini
 - [ ] DELTA Max
-- [ ] DELTA Pro
+  - [ ] Extra Battery
+- [x] DELTA Pro
+  - [ ] Extra Battery
 
 ## How to register for the Energy Dashboard
 - MPPT total input : Solar Panels -> Solar production energy

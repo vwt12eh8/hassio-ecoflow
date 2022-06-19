@@ -1,26 +1,31 @@
-from asyncio import create_task
-from logging import getLogger
-from typing import Callable, Generic, TypeVar
+from datetime import timedelta
+from typing import Any, Callable, TypeVar
 
+import reactivex.operators as ops
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HassJob, HomeAssistant
+from homeassistant.helpers import event
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.device_registry import async_get as async_get_dr
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import (CoordinatorEntity,
-                                                      DataUpdateCoordinator)
+from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.util.dt import utcnow
+from reactivex import Observable, Subject, throw
+from reactivex.subject.replaysubject import ReplaySubject
 
-from .ecoflow.local import PRODUCTS, command, has_extra, receive, send
-from .ecoflow.local.client import EcoFlowLocalClient
+from . import ecoflow as ef
+from .ecoflow import receive
+from .ecoflow.rxtcp import RxTcpAutoConnection
 
 CONF_PRODUCT = "product"
+DISCONNECT_TIME = timedelta(seconds=15)
 DOMAIN = "ecoflow"
-_LOGGER = getLogger(__name__)
+
 _PLATFORMS = {
+    Platform.BINARY_SENSOR,
     Platform.LIGHT,
     Platform.NUMBER,
-    Platform.SELECT,
+    # Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 }
@@ -28,200 +33,267 @@ _PLATFORMS = {
 _T = TypeVar("_T")
 
 
-class DataPushCoordinator(Generic[_T], DataUpdateCoordinator[_T]):
-    __lock = False
+async def to_task(src: Observable[_T]):
+    return await src
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, name: str, client: EcoFlowLocalClient, reqdata: bytes, parser: Callable[[bytes, int], _T], defval: _T = {}):
-        super().__init__(
-            hass, _LOGGER,
-            name=entry.unique_id + "/" + name,
-            update_method=self.__get_data,
-        )
-        self._debounced_refresh.cooldown = 2
-        self.data = defval
-        self.last_update_success = False
-        self.__client = client
-        self.__reqdata = reqdata
-        self.__parser = parser
-        self.__product = entry.data[CONF_PRODUCT]
 
-    def async_set_updated_data(self, data: _T):
-        if self.__lock:
-            return
-        return super().async_set_updated_data(data)
-
-    def async_pushed_args(self, args: bytes):
-        if self.__lock:
-            return
-        self.async_set_updated_data(self.__parser(args, self.__product))
-
-    async def __get_data(self):
-        self.__lock = True
-        try:
-            return self.__parser(await self.__client.request(self.__reqdata), self.__product)
-        finally:
-            self.__lock = False
+async def request(tcp: RxTcpAutoConnection, req: bytes, res: Observable[_T]) -> _T:
+    t = to_task(res.pipe(
+        ops.timeout(5, throw(TimeoutError())),
+        ops.first(),
+    ))
+    tcp.write(req)
+    return await t
 
 
 class HassioEcoFlowClient:
     device_info_extra = None
     serial_extra = None
+    __disconnected = None
     __extra_connected = False
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        self.client = EcoFlowLocalClient(entry.data[CONF_HOST], _LOGGER)
+        self.tcp = RxTcpAutoConnection(entry.data[CONF_HOST], ef.PORT)
         self.product: int = entry.data[CONF_PRODUCT]
         self.serial = entry.unique_id
+        self.diagnostics = dict[str, dict[str, Any]]()
         dr = async_get_dr(hass)
 
         self.device_info_main = DeviceInfo(
             identifiers={(DOMAIN, self.serial)},
             manufacturer="EcoFlow",
-            model=PRODUCTS.get(self.product, None),
+            model=ef.PRODUCTS.get(self.product, None),
             name=entry.title,
         )
-        if CONF_MAC in entry.data:
+        if mac := entry.data.get(CONF_MAC, None):
             self.device_info_main["connections"] = {
-                (CONNECTION_NETWORK_MAC, entry.data[CONF_MAC]),
+                (CONNECTION_NETWORK_MAC, mac),
             }
 
-        self.pd = DataPushCoordinator[dict](
-            hass, entry, "pd", self.client, send.get_pd(), receive.pd)
-        # self.pd.update_interval = timedelta(seconds=5)
-        self.bms_main = DataPushCoordinator[dict](
-            hass, entry, "bms_main", self.client, send.get_bms_main(), receive.bms_main)
-        self.inv = DataPushCoordinator(
-            hass, entry, "inv", self.client, send.get_inv(), receive.inv)
-        self.bms_extra = DataPushCoordinator(
-            hass, entry, "bms_extra", self.client, send.get_bms_extra(), receive.bms_extra)
-        self.dc_in_mode = DataPushCoordinator(
-            hass, entry, "dc_in_mode", self.client, send.get_dc_in_mode(self.product), receive.dc_in_mode, None)
-        self.fan_auto = DataPushCoordinator(
-            hass, entry, "fan_auto", self.client, send.get_fan_auto(), receive.fan_auto, None)
-        self.coordinators: dict[tuple, DataPushCoordinator] = {
-            command.pd: self.pd,
-            command.bms_main: self.bms_main,
-            command.inv: self.inv,
-            command.dc_in_mode(self.product): self.dc_in_mode,
-            command.fan_auto: self.fan_auto,
-        }
+        self.received = self.tcp.received.pipe(
+            receive.merge_packet(),
+            ops.map(receive.decode_packet),
+            ops.share(),
+        )
+        self.pd = self.received.pipe(
+            ops.filter(receive.is_pd),
+            ops.map(lambda x: receive.parse_pd(x[3], self.product)),
+            ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
+            ops.ref_count(),
+        )
+        self.ems = self.received.pipe(
+            ops.filter(receive.is_ems),
+            ops.map(lambda x: receive.parse_ems(x[3], self.product)),
+            ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
+            ops.ref_count(),
+        )
+        self.inverter = self.received.pipe(
+            ops.filter(receive.is_inverter),
+            ops.map(lambda x: receive.parse_inverter(x[3], self.product)),
+            ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
+            ops.ref_count(),
+        )
+        self.mppt = self.received.pipe(
+            ops.filter(receive.is_mppt),
+            ops.map(lambda x: receive.parse_mppt(x[3], self.product)),
+            ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
+            ops.ref_count(),
+        )
+        self.extra = self.received.pipe(
+            ops.filter(receive.is_extra),
+            ops.map(lambda x: receive.parse_extra(x[3], self.product)),
+            ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
+            ops.ref_count(),
+        )
 
-        self.client.connected_handler = self.__connected
-        self.client.disconnected_handler = self.__disconnected
-        self.client.received_handler = self.__received
-        self.client.run()
+        self.disconnected = Subject[None]()
+        self.extra_disconnected = Subject[None]()
 
-        def pd_updated():
-            if "sys_ver" in self.pd.data:
-                self.device_info_main["sw_version"] = self.pd.data["sys_ver"]
+        def _disconnected(*args):
+            self.__disconnected = None
+            self.tcp.reconnect()
+            self.diagnostics.clear()
+            self.extra_disconnected.on_next(None)
+            self.disconnected.on_next(None)
+            if self.__extra_connected:
+                self.__extra_connected = False
+                self.__disconnected_extra()
+        _job = HassJob(_disconnected)
+
+        def reset_timer(*args):
+            if self.__disconnected:
+                self.__disconnected()
+            self.__disconnected = event.async_track_point_in_utc_time(
+                hass,
+                _job,
+                utcnow().replace(microsecond=0) + (DISCONNECT_TIME + timedelta(seconds=1)),
+            )
+
+        def end_timer(ex=None):
+            self.extra_disconnected.on_next(None)
+            self.disconnected.on_next(None)
+            if ex:
+                self.extra_disconnected.on_error(ex)
+                self.disconnected.on_error(ex)
+            else:
+                self.extra_disconnected.on_completed()
+                self.disconnected.on_completed()
+        self.received.subscribe(reset_timer, end_timer, end_timer)
+
+        # self.pd = DataPushCoordinator[dict](
+        #     hass, entry, "pd", self.client, send.get_pd(), receive.pd)
+        # # self.pd.update_interval = timedelta(seconds=5)
+        # self.bms_main = DataPushCoordinator[dict](
+        #     hass, entry, "bms_main", self.client, send.get_bms_main(), receive.bms_main)
+        # self.inv = DataPushCoordinator(
+        #     hass, entry, "inv", self.client, send.get_inv(), receive.inv)
+        # self.bms_extra = DataPushCoordinator(
+        #     hass, entry, "bms_extra", self.client, send.get_bms_extra(), receive.bms_extra)
+        # self.dc_in_mode = DataPushCoordinator(
+        #     hass, entry, "dc_in_mode", self.client, send.get_dc_in_mode(self.product), receive.dc_in_mode, None)
+        # self.fan_auto = DataPushCoordinator(
+        #     hass, entry, "fan_auto", self.client, send.get_fan_auto(), receive.fan_auto, None)
+        # self.coordinators: dict[tuple, DataPushCoordinator] = {
+        #     command.pd: self.pd,
+        #     command.bms_main: self.bms_main,
+        #     command.inv: self.inv,
+        #     command.dc_in_mode(self.product): self.dc_in_mode,
+        #     command.fan_auto: self.fan_auto,
+        # }
+
+        # self.client.connected_handler = self.__connected
+        # self.client.disconnected_handler = self.__disconnected
+        # self.client.received_handler = self.__received
+        # self.client.run()
+
+        def pd_updated(data: dict[str, Any]):
+            self.diagnostics["pd"] = data
+            if "pd_version" in data:
+                self.device_info_main["sw_version"] = data["pd_version"]
                 dr.async_get_or_create(
                     config_entry_id=entry.entry_id,
                     **self.device_info_main,
                 )
-            if self.__extra_connected != has_extra(self.product, self.pd.data.get("model", None)):
-                self.__extra_connected = not self.__extra_connected
-                if self.__extra_connected:
-                    self.__connected_extra()
-                else:
-                    self.__disconnected_extra()
+            # if self.__extra_connected != ef.has_extra(self.product, data.get("model", None)):
+            #     self.__extra_connected = not self.__extra_connected
+            #     if self.__extra_connected:
+            #         self.__connected_extra()
+            #     else:
+            #         self.__disconnected_extra()
+        self.pd.subscribe(pd_updated)
 
-        def extra_updated():
-            if self.device_info_extra is None:
-                return
-            if "sys_ver" in self.pd.data:
-                self.device_info_extra["sw_version"] = self.bms_extra.data["sys_ver"]
+        # def extra_updated(data: dict[str, Any]):
+        #     self.diagnostics["extra"] = data
+        #     if self.device_info_extra is None:
+        #         return
+        #     if "battery_extra_version" in data:
+        #         self.device_info_extra["sw_version"] = data["battery_extra_version"]
+        #         dr.async_get_or_create(
+        #             config_entry_id=entry.entry_id,
+        #             **self.device_info_extra,
+        #         )
+        # self.extra.subscribe(extra_updated)
 
-        self.pd.async_add_listener(pd_updated)
-        self.bms_extra.async_add_listener(extra_updated)
+        def ems_updated(data: dict[str, Any]):
+            self.diagnostics["ems"] = data
+        self.ems.subscribe(ems_updated)
+
+        def inverter_updated(data: dict[str, Any]):
+            self.diagnostics["inverter"] = data
+        self.inverter.subscribe(inverter_updated)
+
+        def mppt_updated(data: dict[str, Any]):
+            self.diagnostics["mppt"] = data
+        self.mppt.subscribe(mppt_updated)
 
     async def close(self):
-        await self.client.close()
+        self.tcp.close()
+        await self.tcp.wait_closed()
 
-    def request(self, data: bytes):
-        return self.client.request(data)
-
-    def __connected(self):
-        async def f():
-            for cmd in self.coordinators:
-                try:
-                    await self.coordinators[cmd].async_refresh()
-                except:
-                    pass
-        create_task(f())
-
-    def __connected_extra(self):
-        async def f():
-            try:
-                data = receive.sn(await self.request(send.get_sn_extra()))
-                self.serial_extra = data["serial"]
-                model = self.device_info_main["model"]
-                if model:
-                    model += " Extra Battery"
-                else:
-                    model = "Extra Battery"
-                self.device_info_extra = DeviceInfo(
-                    identifiers={(DOMAIN, self.serial_extra)},
-                    manufacturer="EcoFlow",
-                    model=model,
-                    name=f"{model} {self.serial_extra[-6:]}",
-                    via_device=(DOMAIN, self.serial),
-                )
-                await self.bms_extra.async_refresh()
-            except:
-                self.__extra_connected = False
-        create_task(f())
-
-    def __disconnected(self):
-        if self.pd._unsub_refresh:
-            self.pd._unsub_refresh()
-            self.pd._unsub_refresh = None
-        if self.__extra_connected:
-            self.__extra_connected = False
-            self.__disconnected_extra()
-        for co in self.coordinators.values():
-            co.last_update_success = False
-            for cb in co._listeners:
-                cb()
+    # def __connected_extra(self):
+    #     async def f():
+    #         try:
+    #             data = receive.sn(await self.request(send.get_serial_extra()))
+    #             self.serial_extra = data["serial"]
+    #             model = self.device_info_main["model"]
+    #             if model:
+    #                 model += " Extra Battery"
+    #             else:
+    #                 model = "Extra Battery"
+    #             self.device_info_extra = DeviceInfo(
+    #                 identifiers={(DOMAIN, self.serial_extra)},
+    #                 manufacturer="EcoFlow",
+    #                 model=model,
+    #                 name=f"{model} {self.serial_extra[-6:]}",
+    #                 via_device=(DOMAIN, self.serial),
+    #             )
+    #             await self.bms_extra.async_refresh()
+    #         except:
+    #             self.__extra_connected = False
+    #     create_task(f())
 
     def __disconnected_extra(self):
         self.serial_extra = None
         self.device_info_extra = None
-        self.bms_extra.last_update_success = False
-        for cb in self.bms_extra._listeners:
-            cb()
-
-    def __received(self, cmd: tuple[int, int, int], args: bytes):
-        if cmd in self.coordinators:
-            self.coordinators[cmd].async_pushed_args(args)
-        if cmd != command.pd:
-            create_task(self.pd.async_request_refresh())
+        self.extra_disconnected.on_next(None)
 
 
-class EcoFlowEntity(Generic[_T], CoordinatorEntity[DataPushCoordinator[_T]]):
-    def __init__(self, client: HassioEcoFlowClient, module: str):
-        super().__init__(getattr(client, module))
+class EcoFlowBaseEntity(Entity):
+    def __init__(self, client: HassioEcoFlowClient, extra: bool):
+        self._attr_available = False
         self._client = client
-        self._is_extra = module == "bms_extra"
-        if self._is_extra:
+        self._is_extra = extra
+        if extra:
             self.__serial = client.serial_extra
+            self._attr_device_info = client.device_info_extra
             self._attr_name = client.device_info_extra["name"]
             self._attr_unique_id = client.serial_extra
         else:
             self.__serial = client.serial
+            self._attr_device_info = client.device_info_main
             self._attr_name = client.device_info_main["name"]
             self._attr_unique_id = client.serial
 
-    @property
-    def available(self):
-        if self._is_extra and self._client.serial_extra != self.__serial:
-            return False
-        return super().available
-
-    @property
-    def device_info(self):
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
         if self._is_extra:
-            return self._client.device_info_extra
-        return self._client.device_info_main
+            self._subscribe(self._client.extra_disconnected,
+                            self.__on_disconnected)
+        else:
+            self._subscribe(self._client.disconnected, self.__on_disconnected)
+
+    def _set_available(self):
+        if not self._is_extra or self.__serial == self._client.serial_extra:
+            self._attr_available = True
+
+    def _subscribe(self, src: Observable, func: Callable):
+        self.async_on_remove(src.subscribe(func).dispose)
+
+    def __on_disconnected(self, *args):
+        if self._attr_available:
+            self._attr_available = False
+            self.async_write_ha_state()
+
+
+class EcoFlowEntity(EcoFlowBaseEntity):
+    def __init__(self, client: HassioEcoFlowClient, src: Observable[dict[str, Any]], key: str, name: str):
+        super().__init__(client, False)
+        self._key = key
+        self._src = src
+        self._attr_name += " " + name
+        self._attr_unique_id += f"-{key.replace('_', '-')}"
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self._subscribe(self._src, self.__updated)
+
+    def __updated(self, data: dict[str, Any]):
+        self._set_available()
+        self._on_updated(data)
+        self.async_write_ha_state()
+
+    def _on_updated(self, data: dict[str, Any]):
+        pass
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
