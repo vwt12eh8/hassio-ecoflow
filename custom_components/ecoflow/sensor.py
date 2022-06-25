@@ -29,18 +29,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                              "remain_display", "Remain time"),
             TotalLevelEntity(client, client.pd, "battery_level",
                              "Total battery level"),
-            UsedTimeEntity(client, client.pd, "ac_out_time",
-                           "AC output used time"),
-            UsedTimeEntity(client, client.pd, "car_in_time",
-                           "DC input used time"),
-            UsedTimeEntity(client, client.pd, "car_out_time",
-                           "DC output used time"),
-            UsedTimeEntity(client, client.pd,
-                           "mppt_time", "MPPT used time"),
-            UsedTimeEntity(client, client.pd, "typec_time",
-                           "USB-C used time"),
-            UsedTimeEntity(client, client.pd,
-                           "usb_time", "USB used time"),
             WattsEntity(client, client.pd, "in_power", "Total input"),
             WattsEntity(client, client.pd, "out_power", "Total output"),
             WattsEntity(client, client.pd, "usb_out1_power",
@@ -56,8 +44,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                            "USB-C left temperature"),
                 TempEntity(client, client.pd, "typec_out2_temp",
                            "USB-C right temperature"),
-                UsedTimeEntity(client, client.pd, "ac_in_time",
-                               "AC input used time"),
                 VoltageEntity(client, client.mppt, "dc_in_voltage",
                               "DC input voltage"),
                 WattsEntity(client, client.inverter,
@@ -163,11 +149,6 @@ class TotalLevelEntity(LevelEntity):
                 "generator_stop": data["generator_level_stop"],
             })
         self.async_write_ha_state()
-
-
-class UsedTimeEntity(BaseEntity):
-    _attr_icon = "mdi:history"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
 class VoltageEntity(BaseEntity):

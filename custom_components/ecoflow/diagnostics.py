@@ -8,7 +8,7 @@ from . import DOMAIN, HassioEcoFlowClient
 
 def _to_serializable(x):
     if type(x) is timedelta:
-        x = x.total_seconds()
+        x = x.__str__()
     return x
 
 
