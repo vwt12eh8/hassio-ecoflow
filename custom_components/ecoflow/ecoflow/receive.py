@@ -285,7 +285,7 @@ def parse_mppt_delta(d: bytes):
         ("dc_in_version", 4, _to_ver_reversed),
         ("dc_in_voltage", 4, _to_int_ex(div=10, max=200)),
         ("dc_in_current", 4, _to_int),
-        ("dc_in_power", 2, _to_int),
+        ("dc_in_power", 2, _to_int_ex(div=10)),
         ("_volt_?_out", 4, _to_int),
         ("_curr_?_out", 4, _to_int),
         ("_watts_?_out", 2, _to_int),
