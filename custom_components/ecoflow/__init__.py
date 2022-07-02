@@ -8,7 +8,7 @@ from homeassistant.core import HassJob, HomeAssistant
 from homeassistant.helpers import event
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.device_registry import async_get as async_get_dr
-from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 from homeassistant.util.dt import utcnow
 from reactivex import Observable, Subject, compose, throw
 from reactivex.subject.replaysubject import ReplaySubject
@@ -25,7 +25,7 @@ _PLATFORMS = {
     Platform.BINARY_SENSOR,
     Platform.LIGHT,
     Platform.NUMBER,
-    # Platform.SELECT,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 }
@@ -110,6 +110,23 @@ class HassioEcoFlowClient:
             ops.ref_count(),
         )
 
+        self.dc_in_current_config = self.received.pipe(
+            ops.filter(receive.is_dc_in_current_config),
+            ops.map(lambda x: receive.parse_dc_in_current_config(x[3])),
+        )
+        self.dc_in_type = self.received.pipe(
+            ops.filter(receive.is_dc_in_type),
+            ops.map(lambda x: receive.parse_dc_in_type(x[3])),
+        )
+        self.fan_auto = self.received.pipe(
+            ops.filter(receive.is_fan_auto),
+            ops.map(lambda x: receive.parse_fan_auto(x[3])),
+        )
+        self.lcd_timeout = self.received.pipe(
+            ops.filter(receive.is_lcd_timeout),
+            ops.map(lambda x: receive.parse_lcd_timeout(x[3])),
+        )
+
         self.disconnected = Subject[Optional[int]]()
 
         def _disconnected(*args):
@@ -176,6 +193,9 @@ class HassioEcoFlowClient:
 
 
 class EcoFlowBaseEntity(Entity):
+    _attr_should_poll = False
+    _connected = False
+
     def __init__(self, client: HassioEcoFlowClient, bms_id: Optional[int] = None):
         self._attr_available = False
         self._client = client
@@ -196,6 +216,7 @@ class EcoFlowBaseEntity(Entity):
     def __on_disconnected(self, bms_id: Optional[int]):
         if bms_id is not None and self._bms_id != bms_id:
             return
+        self._connected = False
         if self._attr_available:
             self._attr_available = False
             self.async_write_ha_state()
@@ -220,6 +241,25 @@ class EcoFlowEntity(EcoFlowBaseEntity):
 
     def _on_updated(self, data: dict[str, Any]):
         pass
+
+
+class EcoFlowConfigEntity(EcoFlowBaseEntity):
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_should_poll = True
+
+    def __init__(self, client: HassioEcoFlowClient, key: str, name: str):
+        super().__init__(client)
+        self._attr_name += " " + name
+        self._attr_unique_id += f"-{key.replace('_', '-')}"
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self._subscribe(self._client.received, self.__updated)
+
+    def __updated(self, data):
+        if not self._connected:
+            self._connected = True
+            self.async_schedule_update_ha_state(True)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):

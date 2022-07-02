@@ -41,7 +41,7 @@ def reset():
     return build2(2, 32, 3)
 
 
-def _system_stand(value: int):
+def set_standby_timeout(value: int):
     return build2(2, 32, 33, value.to_bytes(2, "little"))
 
 
@@ -54,7 +54,7 @@ def set_light(product: int, value: int):
 
 
 def set_dc_out(product: int, enable: bool):
-    if 12 < product < 16:
+    if is_delta(product):
         cmd = (5, 32, 81)
     elif product == 20:
         cmd = (8, 8, 3)
@@ -76,6 +76,10 @@ def set_lcd(product: int, time: int = 0xFFFF, light: int = 255):
     return build2(2, 32, 39, arg)
 
 
+def get_lcd():
+    return build2(2, 32, 40)
+
+
 def close(value: int):
     return build2(2, 32, 41, value.to_bytes(2, "little"))
 
@@ -84,20 +88,20 @@ def get_ems_main():
     return build2(3, 32, 2)
 
 
-def set_ups(product: int, value: int):
+def set_level_max(product: int, value: int):
     dst = 4 if product == 17 else 3
     return build2(dst, 32, 49, bytes([value]))
 
 
-def set_min_dsg(value: int):
+def set_level_min(value: int):
     return build2(3, 32, 51, bytes([value]))
 
 
-def open_oil(value: int):
+def set_generate_start(value: int):
     return build2(3, 32, 52, bytes([value]))
 
 
-def close_oil(value: int):
+def set_generate_stop(value: int):
     return build2(3, 32, 53, bytes([value]))
 
 
@@ -105,7 +109,7 @@ def get_inverter():
     return build2(4, 32, 2)
 
 
-def set_silence_charge(product: int, value: bool):
+def set_ac_in_slow(value: bool):
     return build2(4, 32, 65, bytes([_btoi(value)]))
 
 
@@ -119,16 +123,16 @@ def set_ac_out(product: int, enable: bool = None, xboost: bool = None, freq: int
     return build2(*cmd, bytes(arg))
 
 
-def set_dc_in_mode(product: int, value: int):
-    if 12 < product < 16:
+def set_dc_in_type(product: int, value: int):
+    if is_delta(product):
         cmd = (5, 32, 82)
     else:
         cmd = (4, 32, 67)
     return build2(*cmd, bytes([value]))
 
 
-def get_dc_in_mode(product: int):
-    if 12 < product < 16:
+def get_dc_in_type(product: int):
+    if is_delta(product):
         cmd = (5, 32, 82)
     else:
         cmd = (4, 32, 68)
@@ -143,12 +147,12 @@ def set_ac_in_limit(watts: int = 0xFFFF, pause: bool = None):
 
 
 def set_dc_in_current(product: int, value: int):
-    dst = 5 if 12 < product < 16 else 4
+    dst = 5 if is_delta(product) else 4
     return build2(dst, 32, 71, value.to_bytes(4, "little"))
 
 
 def get_dc_in_current(product: int):
-    dst = 5 if 12 < product < 16 else 4
+    dst = 5 if is_delta(product) else 4
     return build2(dst, 32, 72)
 
 
@@ -168,7 +172,7 @@ def set_lab(value: int):
     return build2(4, 32, 84, bytes([value]))
 
 
-def set_ac_standby_min(value: int):
+def set_ac_timeout(value: int):
     return build2(4, 32, 153, value.to_bytes(2, "little"))
 
 

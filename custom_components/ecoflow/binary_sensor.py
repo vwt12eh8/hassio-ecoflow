@@ -24,9 +24,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if is_delta(client.product):
             entities.extend([
                 ExtraErrorEntity(client, client.bms.pipe(select_bms(
-                    1), ops.share()), "battery_error", "Extra1 error", 1),
+                    1), ops.share()), "battery_error", "Extra1 status", 1),
                 ExtraErrorEntity(client, client.bms.pipe(select_bms(
-                    2), ops.share()), "battery_error", "Extra2 error", 2),
+                    2), ops.share()), "battery_error", "Extra2 status", 2),
                 InputEntity(client, client.inverter, "ac_in_type", "AC input"),
                 InputEntity(client, client.mppt, "dc_in_state", "DC input"),
                 CustomChargeEntity(client, client.inverter,
@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if is_river(client.product):
             entities.extend([
                 ExtraErrorEntity(client, client.bms.pipe(select_bms(
-                    1), ops.share()), "battery_error", "Extra error", 1),
+                    1), ops.share()), "battery_error", "Extra status", 1),
                 InputEntity(client, client.inverter, "in_type", "Input"),
             ])
 
@@ -109,7 +109,7 @@ class MainErrorEntity(BinarySensorEntity, EcoFlowBaseEntity):
 
     def __init__(self, client: HassioEcoFlowClient):
         super().__init__(client)
-        self._attr_name += " Main Error"
+        self._attr_name += " Main status"
         self._attr_unique_id += "-error"
         self._attr_extra_state_attributes = {}
 

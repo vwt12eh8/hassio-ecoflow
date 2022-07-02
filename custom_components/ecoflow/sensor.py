@@ -4,8 +4,10 @@ import reactivex.operators as ops
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
                                              SensorStateClass)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (ELECTRIC_POTENTIAL_VOLT, ENERGY_WATT_HOUR,
-                                 PERCENTAGE, POWER_WATT, TEMP_CELSIUS)
+from homeassistant.const import (ELECTRIC_CURRENT_AMPERE,
+                                 ELECTRIC_POTENTIAL_VOLT, ENERGY_WATT_HOUR,
+                                 FREQUENCY_HERTZ, PERCENTAGE, POWER_WATT,
+                                 TEMP_CELSIUS)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from reactivex import Observable
@@ -20,6 +22,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     if is_power_station(client.product):
         entities.extend([
+            CurrentEntity(client, client.inverter,
+                          "ac_in_current", "AC input current"),
+            CurrentEntity(client, client.inverter,
+                          "ac_out_current", "AC output current"),
             EnergyEntity(client, client.pd, "mppt_in_energy",
                          "MPPT input energy"),
             EnergySumEntity(client, "in_energy", [
@@ -27,8 +33,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             EnergySumEntity(client, "out_energy", [
                             "ac", "car"], "Total output energy"),
             FanEntity(client, client.inverter, "fan_state", "Fan"),
+            FrequencyEntity(client, client.inverter,
+                            "ac_in_freq", "AC input frequency"),
+            FrequencyEntity(client, client.inverter,
+                            "ac_out_freq", "AC output frequency"),
+            TempEntity(client, client.inverter, "ac_in_temp",
+                       "AC input temperature"),
+            TempEntity(client, client.inverter, "ac_out_temp",
+                       "AC output temperature"),
             TotalLevelEntity(client, client.pd, "battery_level",
                              "Battery"),
+            VoltageEntity(client, client.inverter,
+                          "ac_in_voltage", "AC input voltage"),
+            VoltageEntity(client, client.inverter,
+                          "ac_out_voltage", "AC output voltage"),
             WattsEntity(client, client.pd, "in_power", "Total input"),
             WattsEntity(client, client.pd, "out_power", "Total output"),
             WattsEntity(client, client.inverter, "ac_out_power", "AC output"),
@@ -44,18 +62,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 client.bms.pipe(select_bms(2), ops.share()),
             )
             entities.extend([
+                CurrentEntity(client, client.mppt, "dc_in_current",
+                              "DC input current"),
+                CyclesEntity(
+                    client, bms[0], "battery_cycles", "Main battery cycles", 0),
+                CyclesEntity(
+                    client, bms[1], "battery_cycles", "Extra1 battery cycles", 1),
+                CyclesEntity(
+                    client, bms[2], "battery_cycles", "Extra2 battery cycles", 2),
                 SingleLevelEntity(
-                    client, bms[0], "battery_level_f32", "Main battery"),
+                    client, bms[0], "battery_level_f32", "Main battery", 0),
                 SingleLevelEntity(
                     client, bms[1], "battery_level_f32", "Extra1 battery", 1),
                 SingleLevelEntity(
                     client, bms[2], "battery_level_f32", "Extra2 battery", 2),
                 TempEntity(client, bms[0], "battery_temp",
-                           "Main battery temperature"),
+                           "Main battery temperature", 0),
                 TempEntity(client, bms[1], "battery_temp",
                            "Extra1 battery temperature", 1),
                 TempEntity(client, bms[2], "battery_temp",
                            "Extra2 battery temperature", 2),
+                TempEntity(client, client.mppt, "dc_in_temp",
+                           "DC input temperature"),
+                TempEntity(client, client.mppt, "dc24_temp",
+                           "DC output temperature"),
                 TempEntity(client, client.pd, "typec_out1_temp",
                            "USB-C left temperature"),
                 TempEntity(client, client.pd, "typec_out2_temp",
@@ -81,6 +111,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if is_river(client.product):
             extra = client.bms.pipe(select_bms(1), ops.share())
             entities.extend([
+                CurrentEntity(client, client.inverter, "dc_in_current",
+                              "DC input current"),
+                CyclesEntity(client, client.ems, "battery_cycles",
+                             "Main battery cycles"),
+                CyclesEntity(client, extra, "battery_cycles",
+                             "Extra battery cycles", 1),
                 SingleLevelEntity(client, client.ems, "battery_main_level",
                             "Main battery"),
                 SingleLevelEntity(
@@ -109,6 +145,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class BaseEntity(SensorEntity, EcoFlowEntity):
     def _on_updated(self, data: dict[str, Any]):
         self._attr_native_value = data[self._key]
+
+
+class CurrentEntity(BaseEntity):
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = ELECTRIC_CURRENT_AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+
+class CyclesEntity(BaseEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-heart-variant"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
 
 class EnergyEntity(BaseEntity):
@@ -147,6 +196,13 @@ class FanEntity(BaseEntity):
         return "mdi:fan"
 
 
+class FrequencyEntity(BaseEntity):
+    _attr_device_class = SensorDeviceClass.FREQUENCY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = FREQUENCY_HERTZ
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+
 class LevelEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = PERCENTAGE
@@ -160,14 +216,12 @@ class LevelEntity(BaseEntity):
 class SingleLevelEntity(LevelEntity):
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
-        if "battery_main_capacity_remain" in data:
-            self._attr_extra_state_attributes["capacity_remain"] = data["battery_main_capacity_remain"]
-        if "battery_main_capacity_full" in data:
-            self._attr_extra_state_attributes["capacity_full"] = data["battery_main_capacity_full"]
         if "battery_capacity_remain" in data:
             self._attr_extra_state_attributes["capacity_remain"] = data["battery_capacity_remain"]
         if "battery_capacity_full" in data:
             self._attr_extra_state_attributes["capacity_full"] = data["battery_capacity_full"]
+        if "battery_capacity_design" in data:
+            self._attr_extra_state_attributes["capacity_design"] = data["battery_capacity_design"]
 
 
 class TempEntity(BaseEntity):
@@ -184,26 +238,23 @@ class TotalLevelEntity(LevelEntity):
 
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
-        self._attr_extra_state_attributes["remain_time"] = data["remain_display"].__str__(
+        self._attr_extra_state_attributes["remain"] = data["remain_display"].__str__(
         )
 
     def __ems_updated(self, data: dict[str, Any]):
-        self._attr_extra_state_attributes.update({
-            "limit_max": data["battery_level_max"],
-        })
-        if self._client.product == 14:
+        if "battery_remain_charge" in data:
             self._attr_extra_state_attributes.update({
-                "limit_min": data["battery_level_min"],
-                "generator_start": data["generator_level_start"],
-                "generator_stop": data["generator_level_stop"],
+                "remain_charge": data["battery_remain_charge"].__str__(),
+                "remain_discharge": data["battery_remain_discharge"].__str__(),
             })
-        self.async_write_ha_state()
+            self.async_write_ha_state()
 
 
 class VoltageEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = ELECTRIC_POTENTIAL_VOLT
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
 
 class WattsEntity(BaseEntity):

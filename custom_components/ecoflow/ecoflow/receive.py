@@ -68,14 +68,12 @@ def _to_int(d: bytes):
     return int.from_bytes(d, "little")
 
 
-def _to_int_ex(div: int = 1, max: Optional[int] = None):
+def _to_int_ex(div: int = 1):
     def f(d: bytes):
         v = _to_int(d)
         if v is None:
             return None
         v /= div
-        if max is not None and v > max:
-            return None
         return v
     return f
 
@@ -116,12 +114,28 @@ def is_bms(x: tuple[int, int, int]):
     return x[0:3] == (3, 32, 50) or x[0:3] == (6, 32, 2) or x[0:3] == (6, 32, 50)
 
 
+def is_dc_in_current_config(x: tuple[int, int, int]):
+    return x[0:3] == (4, 32, 72) or x[0:3] == (5, 32, 72)
+
+
+def is_dc_in_type(x: tuple[int, int, int]):
+    return x[0:3] == (4, 32, 68) or x[0:3] == (5, 32, 82)
+
+
 def is_ems(x: tuple[int, int, int]):
     return x[0:3] == (3, 32, 2)
 
 
+def is_fan_auto(x: tuple[int, int, int]):
+    return x[0:3] == (4, 32, 74)
+
+
 def is_inverter(x: tuple[int, int, int]):
     return x[0:3] == (4, 32, 2)
+
+
+def is_lcd_timeout(x: tuple[int, int, int]):
+    return x[0:3] == (2, 32, 40)
 
 
 def is_mppt(x: tuple[int, int, int]):
@@ -200,6 +214,14 @@ def parse_bms_river(d: bytes):
     ]))
 
 
+def parse_dc_in_current_config(d: bytes):
+    return int.from_bytes(d[:4], "little")
+
+
+def parse_dc_in_type(d: bytes):
+    return d[1]
+
+
 def parse_ems(d: bytes, product: int):
     if is_delta(product):
         return parse_ems_delta(d)
@@ -247,9 +269,9 @@ def parse_ems_river(d: bytes):
         ("battery_main_current", 4, _to_int),
         ("battery_main_temp", 1, _to_int),
         ("_open_bms_idx", 1, _to_int),
-        ("battery_main_capacity_remain", 4, _to_int),
-        ("battery_main_capacity_full", 4, _to_int),
-        ("battery_main_cycles", 4, _to_int),
+        ("battery_capacity_remain", 4, _to_int),
+        ("battery_capacity_full", 4, _to_int),
+        ("battery_cycles", 4, _to_int),
         ("battery_level_max", 1, _to_int),
         ("battery_main_voltage_max", 2, _to_int_ex(div=1000)),
         ("battery_main_voltage_min", 2, _to_int_ex(div=1000)),
@@ -265,6 +287,10 @@ def parse_ems_river(d: bytes):
 
 # def parse_ems_river_mini(d: bytes):
 #     pass
+
+def parse_fan_auto(d: bytes):
+    return d[0] == 1
+
 
 def parse_inverter(d: bytes, product: int):
     if is_delta(product):
@@ -284,16 +310,16 @@ def parse_inverter_delta(d: bytes):
         ("ac_in_power", 2, _to_int),
         ("ac_out_power", 2, _to_int),
         ("ac_type", 1, _to_int),
-        ("ac_out_voltage", 4, _to_int),
-        ("ac_out", 4, _to_int),
+        ("ac_out_voltage", 4, _to_int_ex(div=1000)),
+        ("ac_out_current", 4, _to_int_ex(div=1000)),
         ("ac_out_freq", 1, _to_int),
         ("ac_in_voltage", 4, _to_int_ex(div=1000)),
-        ("ac_in_current", 4, _to_int),
+        ("ac_in_current", 4, _to_int_ex(div=1000)),
         ("ac_in_freq", 1, _to_int),
         ("ac_out_temp", 2, _to_int),
         ("dc_in_voltage", 4, _to_int),
         ("dc_in_current", 4, _to_int),
-        ("dc_in_temp", 2, _to_int),
+        ("ac_in_temp", 2, _to_int),
         ("fan_state", 1, _to_int),
         ("ac_out_state", 1, _to_int),
         ("ac_out_xboost", 1, _to_int),
@@ -304,6 +330,7 @@ def parse_inverter_delta(d: bytes):
         ("ac_in_limit_switch", 1, _to_int),
         ("ac_in_limit_max", 2, _to_int),
         ("ac_in_limit_custom", 2, _to_int),
+        ("ac_out_timeout", 2, _to_int),
     ])
 
 
@@ -315,25 +342,29 @@ def parse_inverter_river(d: bytes):
         ("in_power", 2, _to_int),
         ("ac_out_power", 2, _to_int),
         ("ac_type", 1, _to_int),
-        ("ac_out_voltage", 4, _to_int),
-        ("ac_out_current", 4, _to_int),
+        ("ac_out_voltage", 4, _to_int_ex(div=1000)),
+        ("ac_out_current", 4, _to_int_ex(div=1000)),
         ("ac_out_freq", 1, _to_int),
-        ("ac_in_voltage", 4, _to_int),
-        ("ac_in_current", 4, _to_int),
+        ("ac_in_voltage", 4, _to_int_ex(div=1000)),
+        ("ac_in_current", 4, _to_int_ex(div=1000)),
         ("ac_in_freq", 1, _to_int),
         ("ac_out_temp", 1, _to_int),
-        ("dc_in_voltage", 4, _to_int_ex(div=1000, max=200)),
-        ("dc_in_current", 4, _to_int),
+        ("dc_in_voltage", 4, _to_int_ex(div=1000)),
+        ("dc_in_current", 4, _to_int_ex(div=1000)),
         ("ac_in_temp", 1, _to_int),
         ("fan_state", 1, _to_int),
         ("ac_out_state", 1, _to_int),
         ("ac_out_xboost", 1, _to_int),
-        ("ac_out_voltage_cfg", 4, _to_int_ex(div=1000)),
+        ("ac_out_voltage_config", 4, _to_int_ex(div=1000)),
         ("ac_out_freq_config", 1, _to_int),
-        ("ac_in_speed", 1, _to_int),
-        ("standby_timeout", 2, _to_timedelta_min),
+        ("ac_in_slow", 1, _to_int),
+        ("ac_out_timeout", 2, _to_int),
         ("fan_config", 1, _to_int),
     ])
+
+
+def parse_lcd_timeout(d: bytes):
+    return int.from_bytes(d[1:3], "little")
 
 
 def parse_mppt(d: bytes, product: int):
@@ -346,7 +377,7 @@ def parse_mppt_delta(d: bytes):
     return _parse_dict(d, [
         ("dc_in_error", 4, _to_int),
         ("dc_in_version", 4, _to_ver_reversed),
-        ("dc_in_voltage", 4, _to_int_ex(div=10, max=200)),
+        ("dc_in_voltage", 4, _to_int_ex(div=10)),
         ("dc_in_current", 4, _to_int_ex(div=100)),
         ("dc_in_power", 2, _to_int_ex(div=10)),
         ("_volt_?_out", 4, _to_int),
@@ -408,8 +439,8 @@ def parse_pd_delta(d: bytes):
         ("car_out_state", 1, _to_int),
         ("car_out_power", 1, _to_int),
         ("car_out_temp", 1, _to_int),
-        ("standby_timeout", 2, _to_timedelta_min),
-        ("lcd_timeout", 2, _to_timedelta_sec),
+        ("standby_timeout", 2, _to_int),
+        ("lcd_timeout", 2, _to_int),
         ("lcd_brightness", 1, _to_int),
         ("car_in_energy", 4, _to_int),
         ("mppt_in_energy", 4, _to_int),
@@ -449,7 +480,7 @@ def parse_pd_river(d: bytes):
         ("light_power", 1, _to_int),
         ("typec_out1_temp", 1, _to_int),
         ("car_out_temp", 1, _to_int),
-        ("standby_timeout", 2, _to_timedelta_min),
+        ("standby_timeout", 2, _to_int),
         ("car_in_energy", 4, _to_int),
         ("mppt_in_energy", 4, _to_int),
         ("ac_in_energy", 4, _to_int),

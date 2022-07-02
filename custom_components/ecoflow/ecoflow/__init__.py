@@ -53,6 +53,10 @@ def is_delta(product: int):
     return 12 < product < 16
 
 
+def is_delta_pro(product: int):
+    return product == 14
+
+
 def is_power_station(product: int):
     return is_delta(product) or is_river(product) or is_river_mini(product)
 

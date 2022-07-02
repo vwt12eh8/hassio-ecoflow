@@ -20,5 +20,5 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
     values = {}
     for i in client.diagnostics:
         d = client.diagnostics[i]
-        values[i] = {x: _to_serializable(d[x]) for x in d}
+        values[i] = _to_serializable(d)
     return values

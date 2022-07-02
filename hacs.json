@@ -4,6 +4,7 @@
     "binary_sensor",
     "light",
     "number",
+    "select",
     "sensor",
     "switch"
   ],
