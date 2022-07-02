@@ -13,7 +13,8 @@ from homeassistant.helpers.entity import EntityCategory
 from reactivex import Observable
 
 from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
-from .ecoflow import is_delta, is_power_station, is_river
+from .ecoflow import (is_delta, is_delta_mini, is_delta_pro, is_power_station,
+                      is_river)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
@@ -66,22 +67,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                               "DC input current"),
                 CyclesEntity(
                     client, bms[0], "battery_cycles", "Main battery cycles", 0),
-                CyclesEntity(
-                    client, bms[1], "battery_cycles", "Extra1 battery cycles", 1),
-                CyclesEntity(
-                    client, bms[2], "battery_cycles", "Extra2 battery cycles", 2),
                 SingleLevelEntity(
                     client, bms[0], "battery_level_f32", "Main battery", 0),
-                SingleLevelEntity(
-                    client, bms[1], "battery_level_f32", "Extra1 battery", 1),
-                SingleLevelEntity(
-                    client, bms[2], "battery_level_f32", "Extra2 battery", 2),
                 TempEntity(client, bms[0], "battery_temp",
                            "Main battery temperature", 0),
-                TempEntity(client, bms[1], "battery_temp",
-                           "Extra1 battery temperature", 1),
-                TempEntity(client, bms[2], "battery_temp",
-                           "Extra2 battery temperature", 2),
                 TempEntity(client, client.mppt, "dc_in_temp",
                            "DC input temperature"),
                 TempEntity(client, client.mppt, "dc24_temp",
@@ -96,18 +85,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "ac_in_power", "AC input"),
                 WattsEntity(client, client.mppt, "dc_in_power", "DC input"),
                 WattsEntity(client, client.mppt, "car_out_power", "DC output"),
-                WattsEntity(client, client.pd, "usbqc_out1_power",
-                            "USB-FC left output"),
-                WattsEntity(client, client.pd, "usbqc_out2_power",
-                            "USB-FC right output"),
-                WattsEntity(client, client.pd, "typec_out1_power",
-                            "USB-C left output"),
-                WattsEntity(client, client.pd, "typec_out2_power",
-                            "USB-C right output"),
             ])
-            if client.product == 14:  # DELTA Pro
-                entities.append(WattsEntity(client, client.mppt,
-                                "anderson_out_power", "Anderson output"))
+            if is_delta_mini(client.product):
+                entities.extend([
+                    WattsEntity(client, client.pd,
+                                "usbqc_out1_power", "USB-FC output"),
+                    WattsEntity(client, client.pd,
+                                "typec_out1_power", "USB-C output"),
+                ])
+            else:
+                entities.extend([
+                    CyclesEntity(
+                        client, bms[1], "battery_cycles", "Extra1 battery cycles", 1),
+                    CyclesEntity(
+                        client, bms[2], "battery_cycles", "Extra2 battery cycles", 2),
+                    SingleLevelEntity(
+                        client, bms[1], "battery_level_f32", "Extra1 battery", 1),
+                    SingleLevelEntity(
+                        client, bms[2], "battery_level_f32", "Extra2 battery", 2),
+                    TempEntity(client, bms[1], "battery_temp",
+                               "Extra1 battery temperature", 1),
+                    TempEntity(client, bms[2], "battery_temp",
+                               "Extra2 battery temperature", 2),
+                    WattsEntity(client, client.pd, "usbqc_out1_power",
+                                "USB-FC left output"),
+                    WattsEntity(client, client.pd, "usbqc_out2_power",
+                                "USB-FC right output"),
+                    WattsEntity(client, client.pd, "typec_out1_power",
+                                "USB-C left output"),
+                    WattsEntity(client, client.pd, "typec_out2_power",
+                                "USB-C right output"),
+                ])
+            if is_delta_pro(client.product):
+                entities.extend([
+                    WattsEntity(client, client.mppt,
+                                "anderson_out_power", "Anderson output"),
+                ])
         if is_river(client.product):
             extra = client.bms.pipe(select_bms(1), ops.share())
             entities.extend([

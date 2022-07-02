@@ -53,6 +53,10 @@ def is_delta(product: int):
     return 12 < product < 16
 
 
+def is_delta_mini(product: int):
+    return product == 15
+
+
 def is_delta_pro(product: int):
     return product == 14
 
