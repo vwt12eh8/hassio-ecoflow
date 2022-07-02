@@ -4,7 +4,7 @@ from typing import Any, Callable, Iterable, Optional, TypedDict
 
 from reactivex import Observable, Observer
 
-from . import calcCrc8, is_delta, is_river
+from . import calcCrc8, calcCrc16, is_delta, is_river
 
 
 class Serial(TypedDict):
@@ -34,6 +34,9 @@ def _merge_packet(obs: Observable[Optional[bytes]]):
                 if 18 + size > len(x):
                     return
                 if calcCrc8(x[:4]) != x[4:5]:
+                    x = x[2:]
+                    continue
+                if calcCrc16(x[:16 + size]) != x[16 + size:18 + size]:
                     x = x[2:]
                     continue
                 sub.on_next(x[:18 + size])
