@@ -31,6 +31,15 @@ def calcCrc16(data: bytes):
     return crc.to_bytes(2, "little")
 
 
+def get_model_name(product: int, model: int):
+    if product == 5 and model == 2:
+        return "RIVER Max"
+    elif product == 18 and model == 2:
+        return "RIVER Max Plus"
+    else:
+        return PRODUCTS.get(product, None)
+
+
 def has_extra(product: int, model: int):
     if product in [5, 12]:
         return model == 2
