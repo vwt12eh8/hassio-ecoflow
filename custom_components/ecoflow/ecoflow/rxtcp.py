@@ -19,6 +19,13 @@ class RxTcpAutoConnection:
         self.__task = create_task(self.__loop())
         self.__opened = Future()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.close()
+        await self.wait_closed()
+
     def close(self):
         self.__is_open = False
         if self.__rx:
