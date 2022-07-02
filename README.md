@@ -10,7 +10,7 @@ Future device updates may prevent integration.
 - [ ] RIVER Mini (Not impl)
 - [ ] RIVER Max
 - [x] RIVER Pro
-  - [ ] Extra Battery
+  - [x] Extra Battery
 - [ ] DELTA Mini
 - [ ] DELTA Max
   - [ ] Extra Battery
@@ -18,6 +18,6 @@ Future device updates may prevent integration.
   - [ ] Extra Battery
 
 ## How to register for the Energy Dashboard
-- MPPT total input : Solar Panels -> Solar production energy
-- total charged : Home Battery Storage -> Energy going in to the battery
-- total discharged : Home Battery Storage -> Energy coming out of the battery
+- MPPT input energy : Solar Panels -> Solar production energy
+- total input energy : Home Battery Storage -> Energy going in to the battery
+- total output energy : Home Battery Storage -> Energy coming out of the battery

@@ -1,5 +1,6 @@
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
+import reactivex.operators as ops
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
                                              SensorStateClass)
 from homeassistant.config_entries import ConfigEntry
@@ -7,8 +8,9 @@ from homeassistant.const import (ELECTRIC_POTENTIAL_VOLT, ENERGY_WATT_HOUR,
                                  PERCENTAGE, POWER_WATT, TEMP_CELSIUS)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from reactivex import Observable
 
-from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient
+from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
 from .ecoflow import is_delta, is_power_station, is_river
 
 
@@ -19,27 +21,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if is_power_station(client.product):
         entities.extend([
             EnergyEntity(client, client.pd, "mppt_in_energy",
-                         "MPPT total charged"),
+                         "MPPT input energy"),
             EnergySumEntity(client, "in_energy", [
-                            "ac", "car", "mppt"], "Total charged"),
+                            "ac", "car", "mppt"], "Total input energy"),
             EnergySumEntity(client, "out_energy", [
-                            "ac", "car"], "Total discharged"),
+                            "ac", "car"], "Total output energy"),
             FanEntity(client, client.inverter, "fan_state", "Fan"),
-            RemainTimeEntity(client, client.pd,
-                             "remain_display", "Remain time"),
             TotalLevelEntity(client, client.pd, "battery_level",
-                             "Total battery level"),
+                             "Battery"),
             WattsEntity(client, client.pd, "in_power", "Total input"),
             WattsEntity(client, client.pd, "out_power", "Total output"),
+            WattsEntity(client, client.inverter, "ac_out_power", "AC output"),
             WattsEntity(client, client.pd, "usb_out1_power",
                         "USB-A left output"),
             WattsEntity(client, client.pd, "usb_out2_power",
                         "USB-A right output"),
         ])
         if is_delta(client.product):
+            bms = (
+                client.bms.pipe(select_bms(0), ops.share()),
+                client.bms.pipe(select_bms(1), ops.share()),
+                client.bms.pipe(select_bms(2), ops.share()),
+            )
             entities.extend([
-                LevelEntity(client, client.ems, "battery_main_level_f32",
-                            "Main battery level"),
+                SingleLevelEntity(
+                    client, bms[0], "battery_level_f32", "Main battery"),
+                SingleLevelEntity(
+                    client, bms[1], "battery_level_f32", "Extra1 battery", 1),
+                SingleLevelEntity(
+                    client, bms[2], "battery_level_f32", "Extra2 battery", 2),
+                TempEntity(client, bms[0], "battery_temp",
+                           "Main battery temperature"),
+                TempEntity(client, bms[1], "battery_temp",
+                           "Extra1 battery temperature", 1),
+                TempEntity(client, bms[2], "battery_temp",
+                           "Extra2 battery temperature", 2),
                 TempEntity(client, client.pd, "typec_out1_temp",
                            "USB-C left temperature"),
                 TempEntity(client, client.pd, "typec_out2_temp",
@@ -49,6 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 WattsEntity(client, client.inverter,
                             "ac_in_power", "AC input"),
                 WattsEntity(client, client.mppt, "dc_in_power", "DC input"),
+                WattsEntity(client, client.mppt, "car_out_power", "DC output"),
                 WattsEntity(client, client.pd, "usbqc_out1_power",
                             "USB-FC left output"),
                 WattsEntity(client, client.pd, "usbqc_out2_power",
@@ -58,14 +75,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 WattsEntity(client, client.pd, "typec_out2_power",
                             "USB-C right output"),
             ])
+            if client.product == 14:  # DELTA Pro
+                entities.append(WattsEntity(client, client.mppt,
+                                "anderson_out_power", "Anderson output"))
         if is_river(client.product):
+            extra = client.bms.pipe(select_bms(1), ops.share())
             entities.extend([
-                LevelEntity(client, client.ems, "battery_main_level",
-                            "Main battery level"),
+                SingleLevelEntity(client, client.ems, "battery_main_level",
+                            "Main battery"),
+                SingleLevelEntity(
+                    client, extra, "battery_level", "Extra battery", 1),
+                TempEntity(client, client.ems, "battery_main_temp",
+                           "Main battery temperature"),
+                TempEntity(client, extra, "battery_temp",
+                           "Extra battery temperature", 1),
+                TempEntity(client, client.pd, "car_out_temp",
+                           "DC output temperature"),
                 TempEntity(client, client.pd, "typec_out1_temp",
                            "USB-C temperature"),
                 VoltageEntity(client, client.inverter, "dc_in_voltage",
                               "DC input voltage"),
+                WattsEntity(client, client.pd, "car_out_power", "DC output"),
+                WattsEntity(client, client.pd, "light_power", "Light output"),
                 WattsEntity(client, client.pd, "usbqc_out1_power",
                             "USB-FC output"),
                 WattsEntity(client, client.pd, "typec_out1_power",
@@ -121,9 +152,22 @@ class LevelEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
 
+    def __init__(self, client: HassioEcoFlowClient, src: Observable[dict[str, Any]], key: str, name: str, bms_id: Optional[int] = None):
+        super().__init__(client, src, key, name, bms_id)
+        self._attr_extra_state_attributes = {}
 
-class RemainTimeEntity(BaseEntity):
-    _attr_icon = "mdi:timer-sand"
+
+class SingleLevelEntity(LevelEntity):
+    def _on_updated(self, data: dict[str, Any]):
+        super()._on_updated(data)
+        if "battery_main_capacity_remain" in data:
+            self._attr_extra_state_attributes["capacity_remain"] = data["battery_main_capacity_remain"]
+        if "battery_main_capacity_full" in data:
+            self._attr_extra_state_attributes["capacity_full"] = data["battery_main_capacity_full"]
+        if "battery_capacity_remain" in data:
+            self._attr_extra_state_attributes["capacity_remain"] = data["battery_capacity_remain"]
+        if "battery_capacity_full" in data:
+            self._attr_extra_state_attributes["capacity_full"] = data["battery_capacity_full"]
 
 
 class TempEntity(BaseEntity):
@@ -138,13 +182,18 @@ class TotalLevelEntity(LevelEntity):
         await super().async_added_to_hass()
         self._subscribe(self._client.ems, self.__ems_updated)
 
+    def _on_updated(self, data: dict[str, Any]):
+        super()._on_updated(data)
+        self._attr_extra_state_attributes["remain_time"] = data["remain_display"].__str__(
+        )
+
     def __ems_updated(self, data: dict[str, Any]):
-        self._attr_extra_state_attributes = {
-            "level_max": data["battery_level_max"],
-        }
+        self._attr_extra_state_attributes.update({
+            "limit_max": data["battery_level_max"],
+        })
         if self._client.product == 14:
             self._attr_extra_state_attributes.update({
-                "level_min": data["battery_level_min"],
+                "limit_min": data["battery_level_min"],
                 "generator_start": data["generator_level_start"],
                 "generator_stop": data["generator_level_stop"],
             })

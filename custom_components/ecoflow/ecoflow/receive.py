@@ -1,6 +1,6 @@
 import struct
 from datetime import timedelta
-from typing import Any, Callable, Iterable, Optional, TypedDict
+from typing import Any, Callable, Iterable, Optional, TypedDict, cast
 
 from reactivex import Observable, Observer
 
@@ -112,20 +112,20 @@ def decode_packet(x: bytes):
     return (x[12], x[14], x[15], args)
 
 
+def is_bms(x: tuple[int, int, int]):
+    return x[0:3] == (3, 32, 50) or x[0:3] == (6, 32, 2) or x[0:3] == (6, 32, 50)
+
+
 def is_ems(x: tuple[int, int, int]):
     return x[0:3] == (3, 32, 2)
 
 
-def is_extra(x: tuple[int, int, int]):
-    return x[0] == 6 and x[2] == 2
-
-
 def is_inverter(x: tuple[int, int, int]):
-    return x[0] == 4 and x[2] == 2
+    return x[0:3] == (4, 32, 2)
 
 
 def is_mppt(x: tuple[int, int, int]):
-    return x[0] == 5 and x[2] == 2
+    return x[0:3] == (5, 32, 2)
 
 
 def is_pd(x: tuple[int, int, int]):
@@ -138,6 +138,66 @@ def is_serial_main(x: tuple[int, int, int]):
 
 def is_serial_extra(x: tuple[int, int, int]):
     return x[0:3] == (6, 1, 65)
+
+
+def parse_bms(d: bytes, product: int):
+    if is_delta(product):
+        return parse_bms_delta(d)
+    if is_river(product):
+        return parse_bms_river(d)
+    return (0, {})
+
+
+def parse_bms_delta(d: bytes):
+    val = _parse_dict(d, [
+        ("num", 1, _to_int),
+        ("battery_type", 1, _to_int),
+        ("battery_cell_id", 1, _to_int),
+        ("battery_error", 4, _to_int),
+        ("battery_version", 4, _to_ver_reversed),
+        ("battery_level", 1, _to_int),
+        ("battery_voltage", 4, _to_int_ex(div=1000)),
+        ("battery_current", 4, _to_int),
+        ("battery_temp", 1, _to_int),
+        ("_open_bms_idx", 1, _to_int),
+        ("battery_capacity_design", 4, _to_int),
+        ("battery_capacity_remain", 4, _to_int),
+        ("battery_capacity_full", 4, _to_int),
+        ("battery_cycles", 4, _to_int),
+        ("_soh", 1, _to_int),
+        ("battery_voltage_max", 2, _to_int_ex(div=1000)),
+        ("battery_voltage_min", 2, _to_int_ex(div=1000)),
+        ("battery_temp_max", 1, _to_int),
+        ("battery_temp_min", 1, _to_int),
+        ("battery_mos_temp_max", 1, _to_int),
+        ("battery_mos_temp_min", 1, _to_int),
+        ("battery_fault", 1, _to_int),
+        ("_sys_stat_reg", 1, _to_int),
+        ("_tag_chg_current", 4, _to_int),
+        ("battery_level_f32", 4, _to_float),
+        ("battery_in_power", 4, _to_int),
+        ("battery_out_power", 4, _to_int),
+        ("battery_remain", 4, _to_timedelta_min),
+    ])
+    return (cast(int, val.pop("num")), val)
+
+
+def parse_bms_river(d: bytes):
+    return (1, _parse_dict(d, [
+        ("battery_error", 4, _to_int),
+        ("battery_version", 4, _to_ver_reversed),
+        ("battery_level", 1, _to_int),
+        ("battery_voltage", 4, _to_int_ex(div=1000)),
+        ("battery_current", 4, _to_int),
+        ("battery_temp", 1, _to_int),
+        ("battery_capacity_remain", 4, _to_int),
+        ("battery_capacity_full", 4, _to_int),
+        ("battery_cycles", 4, _to_int),
+        ("ambient_mode", 1, _to_int),
+        ("ambient_animate", 1, _to_int),
+        ("ambient_color", 4, list),
+        ("ambient_brightness", 1, _to_int),
+    ]))
 
 
 def parse_ems(d: bytes, product: int):
@@ -191,8 +251,8 @@ def parse_ems_river(d: bytes):
         ("battery_main_capacity_full", 4, _to_int),
         ("battery_main_cycles", 4, _to_int),
         ("battery_level_max", 1, _to_int),
-        ("battery_main_voltage_max", 2, _to_int_ex(div=100)),
-        ("battery_main_voltage_min", 2, _to_int_ex(div=100)),
+        ("battery_main_voltage_max", 2, _to_int_ex(div=1000)),
+        ("battery_main_voltage_min", 2, _to_int_ex(div=1000)),
         ("battery_main_temp_max", 1, _to_int),
         ("battery_main_temp_min", 1, _to_int),
         ("mos_temp_max", 1, _to_int),
@@ -284,10 +344,10 @@ def parse_mppt(d: bytes, product: int):
 
 def parse_mppt_delta(d: bytes):
     return _parse_dict(d, [
-        ("dc_in_fault", 4, _to_int),
+        ("dc_in_error", 4, _to_int),
         ("dc_in_version", 4, _to_ver_reversed),
         ("dc_in_voltage", 4, _to_int_ex(div=10, max=200)),
-        ("dc_in_current", 4, _to_int),
+        ("dc_in_current", 4, _to_int_ex(div=100)),
         ("dc_in_power", 2, _to_int_ex(div=10)),
         ("_volt_?_out", 4, _to_int),
         ("_curr_?_out", 4, _to_int),
@@ -300,9 +360,9 @@ def parse_mppt_delta(d: bytes):
         ("anderson_out_voltage", 4, _to_int),
         ("anderson_out_current", 4, _to_int),
         ("anderson_out_power", 2, _to_int),
-        ("car_out_voltage", 4, _to_int),
-        ("car_out_current", 4, _to_int),
-        ("car_out_power", 2, _to_int),
+        ("car_out_voltage", 4, _to_int_ex(div=10)),
+        ("car_out_current", 4, _to_int_ex(div=100)),
+        ("car_out_power", 2, _to_int_ex(div=10)),
         ("car_out_temp", 2, _to_int),
         ("car_out_state", 1, _to_int),
         ("dc24_temp", 2, _to_int),

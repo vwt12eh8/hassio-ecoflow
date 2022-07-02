@@ -7,7 +7,10 @@ from . import DOMAIN, HassioEcoFlowClient
 
 
 def _to_serializable(x):
-    if type(x) is timedelta:
+    t = type(x)
+    if t is dict:
+        x = {y: _to_serializable(x[y]) for y in x}
+    if t is timedelta:
         x = x.__str__()
     return x
 
