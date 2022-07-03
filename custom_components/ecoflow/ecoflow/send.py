@@ -184,8 +184,8 @@ def get_ems_extra():
     return build2(6, 32, 2)
 
 
-def set_ambient(model: int = 255, mode: int = 255, color=(255, 255, 255, 255), brightness=255):
-    arg = [model, mode, *color, brightness]
+def set_ambient(mode: int = 255, animate: int = 255, color=(255, 255, 255, 255), brightness=255):
+    arg = [mode, animate, *color, brightness]
     return build2(6, 32, 97, bytes(arg))
 
 

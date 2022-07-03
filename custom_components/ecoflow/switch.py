@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 
-from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient
+from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
 from .ecoflow import is_delta, is_power_station, is_river, is_river_mini, send
 
 
@@ -34,6 +34,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 FanAutoEntity(client, client.inverter,
                               "fan_config", "Auto Fan Speed"),
             ])
+            if client.product == 5:  # RIVER Max
+                entities.extend([
+                    AmbientSyncEntity(client, client.bms.pipe(
+                        select_bms(1)), "ambient_mode", "Ambient Light Sync Screen", 1)
+                ])
         if not is_river_mini(client.product):
             entities.extend([
                 XBoostEntity(client, client.inverter,
@@ -80,6 +85,28 @@ class AcSlowChargeEntity(SimpleEntity):
 
     async def async_turn_on(self, **kwargs: Any):
         self._client.tcp.write(send.set_ac_in_slow(True))
+
+
+class AmbientSyncEntity(SimpleEntity):
+    _attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def icon(self):
+        return "mdi:sync-off" if self.is_on is False else "mdi:sync"
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ambient(2))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ambient(1))
+
+    def _on_updated(self, data: dict[str, Any]):
+        if data[self._key] == 1:
+            self._attr_is_on = True
+        elif data[self._key] == 2:
+            self._attr_is_on = False
+        else:
+            self._attr_is_on = None
 
 
 class BeepEntity(SimpleEntity):

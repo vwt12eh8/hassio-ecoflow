@@ -8,7 +8,7 @@ Future device updates may prevent integration.
 
 ## Tested products
 - [ ] RIVER Mini (Not impl)
-- [ ] RIVER Max
+- [x] RIVER Max
 - [x] RIVER Pro
   - [x] Extra Battery
 - [ ] DELTA Mini
