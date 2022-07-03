@@ -15,24 +15,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     if is_power_station(client.product):
         entities.extend([
-            AcEntity(client, client.inverter, "ac_out_state", "AC output"),
+            AcEntity(client, client.inverter, "ac_out_state", "AC Output"),
             BeepEntity(client, client.pd, "beep", "Beep"),
         ])
         if is_delta(client.product):
             entities.extend([
                 AcPauseEntity(client, client.inverter,
-                              "ac_in_pause", "AC charge"),
-                DcEntity(client, client.mppt, "car_out_state", "DC output"),
+                              "ac_in_pause", "AC Charge"),
+                DcEntity(client, client.mppt, "car_out_state", "DC Output"),
                 LcdAutoEntity(client, client.pd, "lcd_brightness",
-                              "LCD brightness auto"),
+                              "Screen Brightness Auto"),
             ])
         if is_river(client.product):
             entities.extend([
                 AcSlowChargeEntity(client, client.inverter,
-                                   "ac_in_slow", "AC slow charge"),
-                DcEntity(client, client.pd, "car_out_state", "DC output"),
+                                   "ac_in_slow", "AC Slow Charging"),
+                DcEntity(client, client.pd, "car_out_state", "DC Output"),
                 FanAutoEntity(client, client.inverter,
-                              "fan_config", "Fan auto"),
+                              "fan_config", "Auto Fan Speed"),
             ])
         if not is_river_mini(client.product):
             entities.extend([

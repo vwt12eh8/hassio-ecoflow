@@ -18,25 +18,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if is_power_station(client.product):
         entities.extend([
             DcInCurrentEntity(client, "dc_in_current_config",
-                              "Car input current"),
+                              "Car Input"),
             MaxLevelEntity(client, client.ems,
-                           "battery_level_max", "Battery max"),
+                           "battery_level_max", "Charge Level"),
         ])
         if is_delta(client.product):
             entities.extend([
                 ChargeWattsEntity(client, client.inverter,
-                                  "ac_in_limit_custom", "AC custom charge power"),
+                                  "ac_in_limit_custom", "AC Charge Speed"),
                 LcdBrightnessEntity(client, client.pd,
-                                    "lcd_brightness", "LCD brightness"),
+                                    "lcd_brightness", "Screen Brightness"),
                 MinLevelEntity(client, client.ems,
-                            "battery_level_min", "Battery min"),
+                            "battery_level_min", "Discharge Level"),
             ])
             if is_delta_pro(client.product):
                 entities.extend([
                     GenerateStartEntity(
-                        client, client.ems, "generator_level_start", "Generator start"),
+                        client, client.ems, "generator_level_start", "Smart Generator Auto On"),
                     GenerateStopEntity(
-                        client, client.ems, "generator_level_stop", "Generator stop"),
+                        client, client.ems, "generator_level_stop", "Smart Generator Auto Off"),
                 ])
 
     async_add_entities(entities)
