@@ -114,7 +114,10 @@ class DcInTypeEntity(SelectEntity, EcoFlowConfigEntity):
             self._client.product, _DC_IMPUTS[option]))
 
     async def async_update(self):
-        value = await request(self._client.tcp, self._req, self._client.dc_in_type)
+        try:
+            value = await request(self._client.tcp, self._req, self._client.dc_in_type)
+        except:
+            return
         self._client.diagnostics["dc_in_type"] = value
         self._attr_current_option = next(
             (i for i in _DC_IMPUTS if _DC_IMPUTS[i] == value), None)
@@ -150,7 +153,10 @@ class LcdTimeoutPollEntity(SelectEntity, EcoFlowConfigEntity):
             self._client.product, time=_LCD_OPTIONS[option]))
 
     async def async_update(self):
-        value = await request(self._client.tcp, self._req, self._client.lcd_timeout)
+        try:
+            value = await request(self._client.tcp, self._req, self._client.lcd_timeout)
+        except:
+            return
         self._client.diagnostics["lcd_timeout"] = value
         self._attr_current_option = next(
             (i for i in _LCD_OPTIONS if _LCD_OPTIONS[i] == value), None)

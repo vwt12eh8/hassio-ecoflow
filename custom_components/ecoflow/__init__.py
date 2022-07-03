@@ -42,7 +42,11 @@ async def request(tcp: RxTcpAutoConnection, req: bytes, res: Observable[_T]) -> 
         ops.timeout(5, throw(TimeoutError())),
         ops.first(),
     ))
-    tcp.write(req)
+    try:
+        tcp.write(req)
+    except BaseException as ex:
+        t.close()
+        raise ex
     return await t
 
 

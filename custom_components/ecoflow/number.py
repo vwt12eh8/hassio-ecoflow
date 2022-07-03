@@ -78,7 +78,10 @@ class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
             self._client.product, int(value * 1000)))
 
     async def async_update(self):
-        value = await request(self._client.tcp, send.get_dc_in_current(self._client.product), self._client.dc_in_current_config)
+        try:
+            value = await request(self._client.tcp, send.get_dc_in_current(self._client.product), self._client.dc_in_current_config)
+        except:
+            return
         self._client.diagnostics["dc_in_current_config"] = value
         self._attr_value = int(value / 1000)
         self._attr_available = True
