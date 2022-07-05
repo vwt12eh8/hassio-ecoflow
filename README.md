@@ -21,3 +21,5 @@ Future device updates may prevent integration.
 - MPPT input energy : Solar Panels -> Solar production energy
 - total input energy : Home Battery Storage -> Energy going in to the battery
 - total output energy : Home Battery Storage -> Energy coming out of the battery
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ecoflow)
