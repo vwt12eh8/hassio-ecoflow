@@ -26,8 +26,8 @@ _FREQS = {
 
 _DC_IMPUTS = {
     "Auto": 0,
-    "MPPT": 1,
-    "DC": 2,
+    "Solar": 1,
+    "Car": 2,
 }
 
 _DC_ICONS = {
