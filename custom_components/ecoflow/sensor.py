@@ -38,10 +38,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "ac_in_freq", "AC Input Frequency"),
             FrequencyEntity(client, client.inverter,
                             "ac_out_freq", "AC Output Frequency"),
-            TempEntity(client, client.inverter, "ac_in_temp",
-                       "AC Input Temperature"),
-            TempEntity(client, client.inverter, "ac_out_temp",
-                       "AC Output Temperature"),
             TotalLevelEntity(client, client.pd, "battery_level",
                              "Battery"),
             VoltageEntity(client, client.inverter,
@@ -69,6 +65,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     client, bms[0], "battery_cycles", "Main Battery Cycles", 0),
                 SingleLevelEntity(
                     client, bms[0], "battery_level_f32", "Main Battery", 0),
+                TempEntity(client, client.inverter, "ac_out_temp",
+                           "AC Temperature"),
                 TempEntity(client, bms[0], "battery_temp",
                            "Main Battery Temperature", 0),
                 TempEntity(client, client.mppt, "dc_in_temp",
@@ -134,6 +132,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "Main Battery"),
                 SingleLevelEntity(
                     client, extra, "battery_level", "Extra Battery", 1),
+                TempEntity(client, client.inverter, "ac_in_temp",
+                           "AC Input Temperature"),
+                TempEntity(client, client.inverter, "ac_out_temp",
+                           "AC Output Temperature"),
                 TempEntity(client, client.ems, "battery_main_temp",
                            "Main Battery Temperature"),
                 TempEntity(client, extra, "battery_temp",
@@ -180,12 +182,7 @@ class EnergyEntity(BaseEntity):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
 
-class EnergySumEntity(BaseEntity):
-    _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = ENERGY_WATT_HOUR
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
+class EnergySumEntity(EnergyEntity):
     def __init__(self, client: HassioEcoFlowClient, key: str, keys: list[str], name: str):
         super().__init__(client, client.pd, key, name)
         self._suffix_len = len(key) + 1
