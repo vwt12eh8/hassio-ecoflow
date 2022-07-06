@@ -46,17 +46,17 @@ class BaseEntity(NumberEntity, EcoFlowEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def _on_updated(self, data: dict[str, Any]):
-        self._attr_value = data[self._key]
+        self._attr_native_value = data[self._key]
 
 
 class ChargeWattsEntity(BaseEntity):
     _attr_icon = "mdi:car-speed-limiter"
-    _attr_max_value = 1500
-    _attr_min_value = 200
-    _attr_step = 100
-    _attr_unit_of_measurement = POWER_WATT
+    _attr_native_max_value = 1500
+    _attr_native_min_value = 200
+    _attr_native_step = 100
+    _attr_native_unit_of_measurement = POWER_WATT
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_ac_in_limit(int(value)))
 
     def _on_updated(self, data: dict[str, Any]):
@@ -68,12 +68,12 @@ class ChargeWattsEntity(BaseEntity):
 
 class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
     _attr_icon = "mdi:car-speed-limiter"
-    _attr_max_value = 8
-    _attr_min_value = 4
-    _attr_step = 2
-    _attr_unit_of_measurement = ELECTRIC_CURRENT_AMPERE
+    _attr_native_max_value = 8
+    _attr_native_min_value = 4
+    _attr_native_step = 2
+    _attr_native_unit_of_measurement = ELECTRIC_CURRENT_AMPERE
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_dc_in_current(
             self._client.product, int(value * 1000)))
 
@@ -83,65 +83,65 @@ class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
         except:
             return
         self._client.diagnostics["dc_in_current_config"] = value
-        self._attr_value = int(value / 1000)
+        self._attr_native_value = int(value / 1000)
         self._attr_available = True
 
 
 class GenerateStartEntity(BaseEntity):
     _attr_icon = "mdi:engine-outline"
-    _attr_max_value = 30
-    _attr_min_value = 0
-    _attr_step = 1
-    _attr_unit_of_measurement = PERCENTAGE
+    _attr_native_max_value = 30
+    _attr_native_min_value = 0
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_generate_start(int(value)))
 
 
 class GenerateStopEntity(BaseEntity):
     _attr_icon = "mdi:engine-off-outline"
-    _attr_max_value = 100
-    _attr_min_value = 50
-    _attr_step = 1
-    _attr_unit_of_measurement = PERCENTAGE
+    _attr_native_max_value = 100
+    _attr_native_min_value = 50
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_generate_stop(int(value)))
 
 
 class LcdBrightnessEntity(BaseEntity):
     _attr_icon = "mdi:brightness-6"
-    _attr_max_value = 100
-    _attr_min_value = 0
-    _attr_step = 1
-    _attr_unit_of_measurement = PERCENTAGE
+    _attr_native_max_value = 100
+    _attr_native_min_value = 0
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
 
     def _on_updated(self, data: dict[str, Any]):
-        self._attr_value = data[self._key] & 0x7F
+        self._attr_native_value = data[self._key] & 0x7F
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_lcd(
             self._client.product, light=int(value)))
 
 
 class MaxLevelEntity(BaseEntity):
     _attr_icon = "mdi:battery-arrow-up"
-    _attr_max_value = 100
-    _attr_min_value = 30
-    _attr_step = 1
-    _attr_unit_of_measurement = PERCENTAGE
+    _attr_native_max_value = 100
+    _attr_native_min_value = 30
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_level_max(
             self._client.product, int(value)))
 
 
 class MinLevelEntity(BaseEntity):
     _attr_icon = "mdi:battery-arrow-down-outline"
-    _attr_max_value = 30
-    _attr_min_value = 0
-    _attr_step = 1
-    _attr_unit_of_measurement = PERCENTAGE
+    _attr_native_max_value = 30
+    _attr_native_min_value = 0
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = PERCENTAGE
 
-    async def async_set_value(self, value: float):
+    async def async_set_native_value(self, value: float):
         self._client.tcp.write(send.set_level_min(int(value)))
