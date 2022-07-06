@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any, Callable, Optional
 
 import reactivex.operators as ops
@@ -10,6 +11,7 @@ from homeassistant.const import (ELECTRIC_CURRENT_AMPERE,
                                  TEMP_CELSIUS)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.util.dt import utcnow
 from reactivex import Observable
 
 from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
@@ -38,8 +40,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "ac_in_freq", "AC Input Frequency"),
             FrequencyEntity(client, client.inverter,
                             "ac_out_freq", "AC Output Frequency"),
-            TotalLevelEntity(client, client.pd, "battery_level",
-                             "Battery"),
+            RemainEntity(client, client.pd, "remain_display", "Remain"),
+            LevelEntity(client, client.pd, "battery_level",
+                        "Battery"),
             VoltageEntity(client, client.inverter,
                           "ac_in_voltage", "AC Input Voltage"),
             VoltageEntity(client, client.inverter,
@@ -63,6 +66,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                               "DC Input Current"),
                 CyclesEntity(
                     client, bms[0], "battery_cycles", "Main Battery Cycles", 0),
+                RemainEntity(client, client.ems,
+                             "battery_remain_charge", "Remain Charge"),
+                RemainEntity(client, client.ems,
+                             "battery_remain_discharge", "Remain Discharge"),
                 SingleLevelEntity(
                     client, bms[0], "battery_level_f32", "Main Battery", 0),
                 TempEntity(client, client.inverter, "ac_out_temp",
@@ -223,6 +230,18 @@ class LevelEntity(BaseEntity):
         self._attr_extra_state_attributes = {}
 
 
+class RemainEntity(BaseEntity):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_registry_enabled_default = False
+
+    def _on_updated(self, data: dict[str, Any]):
+        value: timedelta = data[self._key]
+        if value.total_seconds() == 8639940:
+            self._attr_native_value = None
+        else:
+            self._attr_native_value = utcnow() + value
+
+
 class SingleLevelEntity(LevelEntity):
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
@@ -239,25 +258,6 @@ class TempEntity(BaseEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = TEMP_CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
-
-
-class TotalLevelEntity(LevelEntity):
-    async def async_added_to_hass(self):
-        await super().async_added_to_hass()
-        self._subscribe(self._client.ems, self.__ems_updated)
-
-    def _on_updated(self, data: dict[str, Any]):
-        super()._on_updated(data)
-        self._attr_extra_state_attributes["remain"] = data["remain_display"].__str__(
-        )
-
-    def __ems_updated(self, data: dict[str, Any]):
-        if "battery_remain_charge" in data:
-            self._attr_extra_state_attributes.update({
-                "remain_charge": data["battery_remain_charge"].__str__(),
-                "remain_discharge": data["battery_remain_discharge"].__str__(),
-            })
-            self.async_write_ha_state()
 
 
 class VoltageEntity(BaseEntity):

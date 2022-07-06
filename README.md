@@ -22,4 +22,9 @@ Future device updates may prevent integration.
 - total input energy : Home Battery Storage -> Energy going in to the battery
 - total output energy : Home Battery Storage -> Energy coming out of the battery
 
+## About Remain Entities
+The Remain entity is disabled by default because it is highly variable and generates a large number of writes to the database.
+
+If enabled, it is recommended that these entities be included in the exclude in the recorder settings.
+
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ecoflow)
