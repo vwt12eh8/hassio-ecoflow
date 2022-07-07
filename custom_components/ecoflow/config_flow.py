@@ -1,37 +1,45 @@
-from logging import getLogger
-
+import reactivex.operators as ops
 import voluptuous as vol
 from homeassistant.components.dhcp import DhcpServiceInfo
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, CONF_MAC
 
-from . import DOMAIN
-from .ecoflow.local import PRODUCTS, receive, send
-from .ecoflow.local.client import EcoFlowLocalClient
-
-_LOGGER = getLogger(__name__)
+from . import CONF_PRODUCT, DOMAIN, request
+from .ecoflow import PORT, PRODUCTS, receive, send
+from .ecoflow.rxtcp import RxTcpAutoConnection
 
 
 class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     host = None
+    mac = None
 
-    async def _get_sn_main(self):
-        client = EcoFlowLocalClient(self.host, _LOGGER)
-        client.run()
+    async def _get_serial_main(self):
+        tcp = RxTcpAutoConnection(self.host, PORT)
+        received = tcp.received.pipe(
+            receive.merge_packet(),
+            ops.map(receive.decode_packet),
+            ops.filter(receive.is_serial_main),
+            ops.map(lambda x: receive.parse_serial(x[3])),
+        )
         try:
-            info = receive.sn(await client.request(send.get_sn_main()))
+            await tcp.wait_opened()
+            info = await request(tcp, send.get_serial_main(), received)
         finally:
-            await client.close()
+            tcp.close()
+        if info["product"] not in PRODUCTS:
+            return self.async_abort(reason="product_unsupported")
         await self.async_set_unique_id(info["serial"])
         self._abort_if_unique_id_configured(updates={
             CONF_HOST: self.host,
+            CONF_MAC: self.mac,
         })
         return info
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
         self.host = discovery_info.ip
-        await self._get_sn_main()
+        self.mac = discovery_info.macaddress
+        await self._get_serial_main()
         return self.async_show_form(step_id="user")
 
     async def async_step_user(self, user_input: dict = None):
@@ -41,7 +49,7 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
         errors = {}
         if self.host and user_input is not None:
             try:
-                info = await self._get_sn_main()
+                info = await self._get_serial_main()
             except TimeoutError:
                 errors["base"] = "timeout"
             else:
@@ -52,7 +60,8 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
                     title=f'{pn}{info["serial"][-6:]}',
                     data={
                         CONF_HOST: self.host,
-                        "product": info["product"],
+                        CONF_MAC: self.mac,
+                        CONF_PRODUCT: info["product"],
                     },
                 )
 

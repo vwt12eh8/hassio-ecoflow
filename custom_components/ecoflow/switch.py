@@ -1,126 +1,183 @@
-from typing import Callable
+from typing import Any, Callable
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 
-from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient
-from .ecoflow.local import send
+from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
+from .ecoflow import is_delta, is_power_station, is_river, is_river_mini, send
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        AcOutputEntity(client),
-        XboostEntity(client),
-        DcOutputEntity(client),
-        AutoFanEntity(client),
-        SilenceEntity(client),
-    ])
+    entities = []
+
+    if is_power_station(client.product):
+        entities.extend([
+            AcEntity(client, client.inverter, "ac_out_state", "AC Output"),
+            BeepEntity(client, client.pd, "beep", "Beep"),
+        ])
+        if is_delta(client.product):
+            entities.extend([
+                AcPauseEntity(client, client.inverter,
+                              "ac_in_pause", "AC Charge"),
+                DcEntity(client, client.mppt, "car_out_state", "DC Output"),
+                LcdAutoEntity(client, client.pd, "lcd_brightness",
+                              "Screen Brightness Auto"),
+            ])
+        if is_river(client.product):
+            entities.extend([
+                AcSlowChargeEntity(client, client.inverter,
+                                   "ac_in_slow", "AC Slow Charging"),
+                DcEntity(client, client.pd, "car_out_state", "DC Output"),
+                FanAutoEntity(client, client.inverter,
+                              "fan_config", "Auto Fan Speed"),
+            ])
+            if client.product == 5:  # RIVER Max
+                entities.extend([
+                    AmbientSyncEntity(client, client.bms.pipe(
+                        select_bms(1)), "ambient_mode", "Ambient Light Sync Screen", 1)
+                ])
+        if not is_river_mini(client.product):
+            entities.extend([
+                XBoostEntity(client, client.inverter,
+                             "ac_out_xboost", "AC X-Boost"),
+            ])
+
+    async_add_entities(entities)
 
 
-class AutoFanEntity(EcoFlowEntity[dict], SwitchEntity):
-    _attr_device_class = SwitchDeviceClass.SWITCH
+class SimpleEntity(SwitchEntity, EcoFlowEntity):
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_is_on = bool(data[self._key])
+
+
+class AcEntity(SimpleEntity):
+    _attr_device_class = SwitchDeviceClass.OUTLET
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_out(self._client.product, False))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_out(self._client.product, True))
+
+
+class AcPauseEntity(SimpleEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client, "fan_auto")
-        self._attr_name += " auto fan speed"
-        self._attr_unique_id += "-fan_auto"
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_is_on = not bool(data[self._key])
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_in_limit(pause=True))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_in_limit(pause=False))
+
+
+class AcSlowChargeEntity(SimpleEntity):
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:car-speed-limiter"
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_in_slow(False))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_in_slow(True))
+
+
+class AmbientSyncEntity(SimpleEntity):
+    _attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def icon(self):
+        return "mdi:sync-off" if self.is_on is False else "mdi:sync"
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ambient(2))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ambient(1))
+
+    def _on_updated(self, data: dict[str, Any]):
+        if data[self._key] == 1:
+            self._attr_is_on = True
+        elif data[self._key] == 2:
+            self._attr_is_on = False
+        else:
+            self._attr_is_on = None
+
+
+class BeepEntity(SimpleEntity):
+    _attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def icon(self):
+        return "mdi:volume-source" if self.is_on else "mdi:volume-mute"
+
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_is_on = not bool(data[self._key])
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_beep(False))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_beep(True))
+
+
+class DcEntity(SimpleEntity):
+    _attr_device_class = SwitchDeviceClass.OUTLET
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_dc_out(self._client.product, False))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_dc_out(self._client.product, True))
+
+
+class FanAutoEntity(SimpleEntity):
+    _attr_entity_category = EntityCategory.CONFIG
 
     @property
     def icon(self):
         return "mdi:fan-auto" if self.is_on else "mdi:fan-chevron-up"
 
-    @property
-    def is_on(self):
-        return self.coordinator.data
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_fan_auto(self._client.product, False))
 
-    async def async_turn_off(self, **kwargs):
-        await self._client.request(send.set_fan_auto(self._client.product, False))
-        await self.coordinator.async_request_refresh()
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_fan_auto(self._client.product, True))
 
-    async def async_turn_on(self, **kwargs):
-        await self._client.request(send.set_fan_auto(self._client.product, True))
-        await self.coordinator.async_request_refresh()
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_is_on = data[self._key] == 1
 
 
-class BaseOutputEntity(EcoFlowEntity, SwitchEntity):
-    _attr_device_class = SwitchDeviceClass.OUTLET
-    _key: str
-    _mod: str
-    _name: str
-
-    def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client, self._mod)
-        self._attr_name += f" {self._name}"
-        self._attr_unique_id += f"-{self._key}"
-
-    @property
-    def is_on(self):
-        return bool(self.coordinator.data.get(self._key, False))
-
-
-class AcOutputEntity(BaseOutputEntity):
-    _key = "ac_out"
-    _mod = "inv"
-    _name = "AC output"
-
-    async def async_turn_off(self, **kwargs):
-        await self._client.request(send.set_ac_out(self._client.product, False))
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_on(self, **kwargs):
-        await self._client.request(send.set_ac_out(self._client.product, True))
-        await self.coordinator.async_request_refresh()
-
-
-class SilenceEntity(BaseOutputEntity):
-    _attr_device_class = SwitchDeviceClass.SWITCH
+class LcdAutoEntity(SimpleEntity):
     _attr_entity_category = EntityCategory.CONFIG
-    _key = "silence_charge"
-    _mod = "inv"
-    _name = "AC silence charge"
+    _attr_icon = "mdi:brightness-auto"
+    _brightness = 0
 
-    @property
-    def icon(self):
-        return "mdi:fan-chevron-down" if self.is_on else "mdi:fan-auto"
+    def _on_updated(self, data: dict[str, Any]):
+        self._attr_is_on = bool(data[self._key] & 0x80)
+        self._brightness = data[self._key] & 0x7F
 
-    async def async_turn_off(self, **kwargs):
-        await self._client.request(send.set_silence_charge(self._client.product, False))
-        await self.coordinator.async_request_refresh()
+    async def async_turn_off(self, **kwargs: Any):
+        value = self._brightness
+        self._client.tcp.write(send.set_lcd(self._client.product, light=value))
 
-    async def async_turn_on(self, **kwargs):
-        await self._client.request(send.set_silence_charge(self._client.product, True))
-        await self.coordinator.async_request_refresh()
+    async def async_turn_on(self, **kwargs: Any):
+        value = self._brightness | 0x80
+        self._client.tcp.write(send.set_lcd(self._client.product, light=value))
 
 
-class XboostEntity(BaseOutputEntity):
-    _attr_device_class = SwitchDeviceClass.SWITCH
+class XBoostEntity(SimpleEntity):
     _attr_entity_category = EntityCategory.CONFIG
-    _key = "xboost"
-    _mod = "inv"
-    _name = "AC X-Boost"
 
-    async def async_turn_off(self, **kwargs):
-        await self._client.request(send.set_ac_out(self._client.product, xboost=False))
-        await self.coordinator.async_request_refresh()
+    async def async_turn_off(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_out(
+            self._client.product, xboost=False))
 
-    async def async_turn_on(self, **kwargs):
-        await self._client.request(send.set_ac_out(self._client.product, xboost=True))
-        await self.coordinator.async_request_refresh()
-
-
-class DcOutputEntity(BaseOutputEntity):
-    _key = "dc_out"
-    _mod = "pd"
-    _name = "DC output"
-
-    async def async_turn_off(self, **kwargs):
-        await self._client.request(send.set_dc_out(self._client.product, False))
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_on(self, **kwargs):
-        await self._client.request(send.set_dc_out(self._client.product, True))
-        await self.coordinator.async_request_refresh()
+    async def async_turn_on(self, **kwargs: Any):
+        self._client.tcp.write(send.set_ac_out(
+            self._client.product, xboost=True))
