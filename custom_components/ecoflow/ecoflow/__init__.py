@@ -43,6 +43,7 @@ def get_model_name(product: int, model: int):
 def has_extra(product: int, model: int):
     if product in [5, 12]:
         return model == 2
+    return False
 
 
 def has_light(product: int):
