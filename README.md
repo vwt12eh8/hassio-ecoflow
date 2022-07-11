@@ -1,3 +1,5 @@
+![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)
+
 # EcoFlow Portable Power Station Integration for Home Assistant
 
 This integration uses a local API.
