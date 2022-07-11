@@ -1,15 +1,5 @@
 {
   "name": "EcoFlow",
-  "domains": [
-    "binary_sensor",
-    "light",
-    "number",
-    "select",
-    "sensor",
-    "switch"
-  ],
-  "homeassistant": "2022.7.0",
-  "iot_class": [
-    "Local Push"
-  ]
+  "render_readme": true,
+  "homeassistant": "2022.7.0"
 }
