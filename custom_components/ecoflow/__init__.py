@@ -140,14 +140,13 @@ class HassioEcoFlowClient:
             self.disconnected.on_next(None)
             if self.__extra_connected:
                 self.__extra_connected = False
-        _job = HassJob(_disconnected)
 
         def reset_timer(*args):
             if self.__disconnected:
                 self.__disconnected()
             self.__disconnected = event.async_track_point_in_utc_time(
                 hass,
-                _job,
+                _disconnected,
                 utcnow().replace(microsecond=0) + (DISCONNECT_TIME + timedelta(seconds=1)),
             )
 
