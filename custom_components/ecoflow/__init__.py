@@ -196,6 +196,7 @@ class HassioEcoFlowClient:
 
 
 class EcoFlowBaseEntity(Entity):
+    _attr_has_entity_name = True
     _attr_should_poll = False
     _connected = False
 
@@ -204,7 +205,6 @@ class EcoFlowBaseEntity(Entity):
         self._client = client
         self._bms_id = bms_id or 0
         self._attr_device_info = client.device_info_main
-        self._attr_name = client.device_info_main["name"]
         self._attr_unique_id = client.serial
         if bms_id:
             self._attr_unique_id += f"-{bms_id}"
@@ -230,7 +230,7 @@ class EcoFlowEntity(EcoFlowBaseEntity):
         super().__init__(client, bms_id)
         self._key = key
         self._src = src
-        self._attr_name += " " + name
+        self._attr_name = name
         self._attr_unique_id += f"-{key.replace('_', '-')}"
 
     async def async_added_to_hass(self):
@@ -252,7 +252,7 @@ class EcoFlowConfigEntity(EcoFlowBaseEntity):
 
     def __init__(self, client: HassioEcoFlowClient, key: str, name: str):
         super().__init__(client)
-        self._attr_name += " " + name
+        self._attr_name = name
         self._attr_unique_id += f"-{key.replace('_', '-')}"
 
     async def async_added_to_hass(self):

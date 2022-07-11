@@ -23,7 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if client.product == 5:  # RIVER Max
             entities.extend([
                 AmbientEntity(client, client.bms.pipe(
-                    select_bms(1)), "ambient", "Ambient Light", 1),
+                    select_bms(1)), "ambient", "Ambient light", 1),
             ])
 
     async_add_entities(entities)

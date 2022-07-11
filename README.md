@@ -6,6 +6,8 @@ Therefore, if the devices are not on the same network, they cannot synchronize t
 This integration uses a private API.
 Future device updates may prevent integration.
 
+Requires Home Assistant Core 2022.7.0 or later for operation.
+
 ## Tested products
 - [ ] RIVER Mini (Not impl)
 - [x] RIVER Max

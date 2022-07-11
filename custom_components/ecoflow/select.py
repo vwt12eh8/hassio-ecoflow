@@ -62,21 +62,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if is_power_station(client.product):
         entities.extend([
             AcTimeoutEntity(client, client.inverter,
-                            "ac_out_timeout", "AC Timeout"),
+                            "ac_out_timeout", "AC timeout"),
             FreqEntity(client, client.inverter,
-                       "ac_out_freq_config", "AC Frequency"),
+                       "ac_out_freq_config", "AC frequency"),
             StandbyTimeoutEntity(
-                client, client.pd, "standby_timeout", "Unit Timeout"),
+                client, client.pd, "standby_timeout", "Unit timeout"),
         ])
         if is_delta(client.product):
             entities.extend([
                 LcdTimeoutPushEntity(client, client.pd,
-                                     "lcd_timeout", "Screen Timeout"),
+                                     "lcd_timeout", "Screen timeout"),
             ])
         if is_river(client.product):
             entities.extend([
                 DcInTypeEntity(client),
-                LcdTimeoutPollEntity(client, "lcd_timeout", "Screen Timeout"),
+                LcdTimeoutPollEntity(client, "lcd_timeout", "Screen timeout"),
             ])
 
     async_add_entities(entities)
@@ -102,7 +102,7 @@ class DcInTypeEntity(SelectEntity, EcoFlowConfigEntity):
     _attr_options = list(_DC_IMPUTS.keys())
 
     def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client, "dc_in_type_config", "DC Mode")
+        super().__init__(client, "dc_in_type_config", "DC mode")
         self._req = send.get_dc_in_type(client.product)
 
     @property

@@ -15,29 +15,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     if is_power_station(client.product):
         entities.extend([
-            AcEntity(client, client.inverter, "ac_out_state", "AC Output"),
+            AcEntity(client, client.inverter, "ac_out_state", "AC output"),
             BeepEntity(client, client.pd, "beep", "Beep"),
         ])
         if is_delta(client.product):
             entities.extend([
                 AcPauseEntity(client, client.inverter,
-                              "ac_in_pause", "AC Charge"),
-                DcEntity(client, client.mppt, "car_out_state", "DC Output"),
+                              "ac_in_pause", "AC charge"),
+                DcEntity(client, client.mppt, "car_out_state", "DC output"),
                 LcdAutoEntity(client, client.pd, "lcd_brightness",
-                              "Screen Brightness Auto"),
+                              "Screen brightness auto"),
             ])
         if is_river(client.product):
             entities.extend([
                 AcSlowChargeEntity(client, client.inverter,
-                                   "ac_in_slow", "AC Slow Charging"),
-                DcEntity(client, client.pd, "car_out_state", "DC Output"),
+                                   "ac_in_slow", "AC slow charging"),
+                DcEntity(client, client.pd, "car_out_state", "DC output"),
                 FanAutoEntity(client, client.inverter,
-                              "fan_config", "Auto Fan Speed"),
+                              "fan_config", "Auto fan speed"),
             ])
             if client.product == 5:  # RIVER Max
                 entities.extend([
                     AmbientSyncEntity(client, client.bms.pipe(
-                        select_bms(1)), "ambient_mode", "Ambient Light Sync Screen", 1)
+                        select_bms(1)), "ambient_mode", "Ambient light sync screen", 1)
                 ])
         if not is_river_mini(client.product):
             entities.extend([
