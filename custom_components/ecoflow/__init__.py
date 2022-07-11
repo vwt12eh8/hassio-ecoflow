@@ -4,7 +4,7 @@ from typing import Any, Callable, Optional, TypeVar, cast
 import reactivex.operators as ops
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
-from homeassistant.core import HassJob, HomeAssistant
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import event
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.device_registry import async_get as async_get_dr
