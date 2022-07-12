@@ -1,4 +1,6 @@
 ![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)
+[![Validate with hassfest](https://github.com/vwt12eh8/hassio-ecoflow/actions/workflows/hassfest.yml/badge.svg)](https://github.com/vwt12eh8/hassio-ecoflow/actions/workflows/hassfest.yml)
+[![HACS Action](https://github.com/vwt12eh8/hassio-ecoflow/actions/workflows/hacs.yml/badge.svg)](https://github.com/vwt12eh8/hassio-ecoflow/actions/workflows/hacs.yml)
 
 # EcoFlow Portable Power Station Integration for Home Assistant
 
