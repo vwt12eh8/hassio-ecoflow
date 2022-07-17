@@ -27,7 +27,7 @@ Once installed, after restarting Home Assistant, you can start integration as us
 - [x] RIVER Pro
   - [x] Extra Battery
 - [ ] DELTA Mini
-- [ ] DELTA Max
+- [x] DELTA Max ([#12](https://github.com/vwt12eh8/hassio-ecoflow/issues/12))
   - [ ] Extra Battery
 - [x] DELTA Pro
   - [ ] Extra Battery
