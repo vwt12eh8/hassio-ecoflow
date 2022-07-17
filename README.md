@@ -12,6 +12,15 @@ Future device updates may prevent integration.
 
 Requires Home Assistant Core 2022.7.0 or later for operation.
 
+## Installation
+This integration is not included by default and must be installed by yourself to use it.
+
+Two methods are available, and you can choose one or the other.
+- Install as a custom repository via HACS
+- Manually download and extract to the custom_components directory
+
+Once installed, after restarting Home Assistant, you can start integration as usual from Add Integration.
+
 ## Tested products
 - [ ] RIVER Mini (Not impl)
 - [x] RIVER Max
@@ -32,5 +41,3 @@ Requires Home Assistant Core 2022.7.0 or later for operation.
 The Remain entity is disabled by default because it is highly variable and generates a large number of writes to the database.
 
 If enabled, it is recommended that these entities be included in the exclude in the recorder settings.
-
-[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ecoflow)
