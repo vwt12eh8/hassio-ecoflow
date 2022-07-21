@@ -61,9 +61,8 @@ class ChargeWattsEntity(BaseEntity):
 
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
-        self._attr_extra_state_attributes = {
-            "custom_enable": (data["ac_in_limit_switch"] == 2),
-        }
+        if data["ac_type"] == 14:
+            self._attr_native_max_value = 2900
 
 
 class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
