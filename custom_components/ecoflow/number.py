@@ -8,7 +8,8 @@ from homeassistant.helpers.entity import EntityCategory
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowEntity, HassioEcoFlowClient,
                request)
-from .ecoflow import is_delta, is_delta_pro, is_power_station, send
+from .ecoflow import (is_delta, is_delta_max, is_delta_mini, is_delta_pro,
+                      is_power_station, send)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
@@ -61,8 +62,35 @@ class ChargeWattsEntity(BaseEntity):
 
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
-        if data["ac_type"] == 14:
-            self._attr_native_max_value = 2900
+        voltage: float = data["ac_out_voltage_config"]
+        if is_delta_max(self._client.product):
+            if self._client.serial.startswith("DD"):
+                self._attr_native_max_value = 1600
+            elif voltage >= 220:
+                self._attr_native_max_value = 2000
+            elif voltage >= 120:
+                self._attr_native_max_value = 1800
+            elif voltage >= 110:
+                self._attr_native_max_value = 1650
+            else:
+                self._attr_native_max_value = 1500
+        elif is_delta_pro(self._client.product):
+            if voltage >= 240:
+                self._attr_native_max_value = 3000
+            elif voltage >= 230:
+                self._attr_native_max_value = 2900
+            elif voltage >= 220:
+                self._attr_native_max_value = 2200
+            elif voltage >= 120:
+                self._attr_native_max_value = 1800
+            elif voltage >= 110:
+                self._attr_native_max_value = 1650
+            else:
+                self._attr_native_max_value = 1500
+        elif is_delta_mini(self._client.product):
+            self._attr_native_max_value = 900
+        else:
+            self._attr_native_max_value = 1500
 
 
 class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
