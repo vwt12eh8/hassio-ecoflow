@@ -54,6 +54,10 @@ def is_delta(product: int):
     return 12 < product < 16
 
 
+def is_delta_max(product: int):
+    return product == 13
+
+
 def is_delta_mini(product: int):
     return product == 15
 
