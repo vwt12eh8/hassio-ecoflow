@@ -30,12 +30,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                           "ac_in_current", "AC input current"),
             CurrentEntity(client, client.inverter,
                           "ac_out_current", "AC output current"),
+            EnergyEntity(client, client.pd, "ac_in_energy",
+                         "AC input energy"),
+            EnergyEntity(client, client.pd, "ac_out_energy",
+                         "AC output energy"),
+            EnergyEntity(client, client.pd, "car_in_energy",
+                         "Car input energy"),
+            EnergyEntity(client, client.pd, "dc_out_energy",
+                         "DC output energy"),
             EnergyEntity(client, client.pd, "mppt_in_energy",
                          "MPPT input energy"),
-            EnergySumEntity(client, "in_energy", [
-                            "ac", "car", "mppt"], "Total input energy"),
-            EnergySumEntity(client, "out_energy", [
-                            "ac", "car"], "Total output energy"),
             FanEntity(client, client.inverter, "fan_state", "Fan"),
             FrequencyEntity(client, client.inverter,
                             "ac_in_freq", "AC input frequency"),
@@ -197,19 +201,6 @@ class EnergyEntity(BaseEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = ENERGY_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-
-class EnergySumEntity(EnergyEntity):
-    def __init__(self, client: HassioEcoFlowClient, key: str, keys: list[str], name: str):
-        super().__init__(client, client.pd, key, name)
-        self._suffix_len = len(key) + 1
-        self._keys = [f"{x}_{key}" for x in keys]
-
-    def _on_updated(self, data: dict[str, Any]):
-        values = {key[:-self._suffix_len]: data[key]
-                  for key in data if key in self._keys}
-        self._attr_extra_state_attributes = values
-        self._attr_native_value = sum(values.values())
 
 
 class FanEntity(BaseEntity):
