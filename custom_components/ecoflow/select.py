@@ -1,10 +1,11 @@
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import FREQUENCY_HERTZ
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowEntity, HassioEcoFlowClient,
                request)
@@ -55,7 +56,7 @@ _STANDBY_OPTIONS = {
 }
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
     entities = []
 

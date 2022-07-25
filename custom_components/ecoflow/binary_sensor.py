@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any
 
 import reactivex.operators as ops
 from homeassistant.components.binary_sensor import (BinarySensorDeviceClass,
@@ -6,13 +6,14 @@ from homeassistant.components.binary_sensor import (BinarySensorDeviceClass,
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowEntity, HassioEcoFlowClient,
                select_bms)
 from .ecoflow import is_delta, is_power_station, is_river
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
     entities = []
 

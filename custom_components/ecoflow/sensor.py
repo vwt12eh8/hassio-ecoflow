@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 import reactivex.operators as ops
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
@@ -11,6 +11,7 @@ from homeassistant.const import (ELECTRIC_CURRENT_AMPERE,
                                  TEMP_CELSIUS)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.dt import utcnow
 from reactivex import Observable
 
@@ -19,7 +20,7 @@ from .ecoflow import (is_delta, is_delta_mini, is_delta_pro, is_power_station,
                       is_river)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
     entities = []
 

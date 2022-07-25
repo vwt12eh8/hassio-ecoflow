@@ -1,10 +1,11 @@
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.light import (ColorMode, LightEntity,
                                             LightEntityFeature)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
 from .ecoflow import is_river, send
@@ -12,7 +13,7 @@ from .ecoflow import is_river, send
 _EFFECTS = ["Low", "High", "SOS"]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
     entities = []
 

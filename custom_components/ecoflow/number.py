@@ -1,10 +1,11 @@
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ELECTRIC_CURRENT_AMPERE, PERCENTAGE, POWER_WATT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowEntity, HassioEcoFlowClient,
                request)
@@ -12,7 +13,7 @@ from .ecoflow import (is_delta, is_delta_max, is_delta_mini, is_delta_pro,
                       is_power_station, send)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Callable):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
