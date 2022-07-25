@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import reactivex.operators as ops
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
@@ -50,7 +50,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                           "ac_out_voltage", "AC output voltage"),
             WattsEntity(client, client.pd, "in_power", "Total input"),
             WattsEntity(client, client.pd, "out_power", "Total output"),
-            WattsEntity(client, client.inverter, "ac_out_power", "AC output"),
+            WattsEntity(client, client.inverter,
+                        "ac_in_power", "AC input", real=0),
+            WattsEntity(client, client.inverter,
+                        "ac_consumption", "AC output + loss", real=True),
+            WattsEntity(client, client.inverter, "ac_out_power",
+                        "AC output", real=False),
             WattsEntity(client, client.pd, "usb_out1_power",
                         "USB-A left output"),
             WattsEntity(client, client.pd, "usb_out2_power",
@@ -87,10 +92,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                            "USB-C right temperature"),
                 VoltageEntity(client, client.mppt, "dc_in_voltage",
                               "DC input voltage"),
-                WattsEntity(client, client.inverter,
-                            "ac_in_power", "AC input"),
-                WattsEntity(client, client.mppt, "dc_in_power", "DC input"),
-                WattsEntity(client, client.mppt, "car_out_power", "DC output"),
+                WattsEntity(client, client.mppt, "dc_in_power",
+                            "DC input", real=True),
+                WattsEntity(client, client.mppt,
+                            "car_consumption", "Car output + loss", real=True),
+                WattsEntity(client, client.mppt,
+                            "car_out_power", "Car output"),
             ])
             if is_delta_mini(client.product):
                 entities.extend([
@@ -154,7 +161,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                            "USB-C temperature"),
                 VoltageEntity(client, client.inverter, "dc_in_voltage",
                               "DC input voltage"),
-                WattsEntity(client, client.pd, "car_out_power", "DC output"),
+                WattsEntity(client, client.pd, "car_out_power", "Car output"),
+                WattsEntity(client, client.inverter,
+                            "dc_in_power", "DC input", real=True),
                 WattsEntity(client, client.pd, "light_power", "Light output"),
                 WattsEntity(client, client.pd, "usbqc_out1_power",
                             "USB-Fast output"),
@@ -272,3 +281,23 @@ class WattsEntity(BaseEntity):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = POWER_WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, client: HassioEcoFlowClient, src: Observable[dict[str, Any]], key: str, name: str, real: Union[bool, int] = False):
+        super().__init__(client, src, key, name)
+        if key.endswith("_consumption"):
+            self._key = key[:-11] + "out_power"
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._real = real
+
+    def _on_updated(self, data: dict[str, Any]):
+        key = self._key[:-5]
+        if self._real is not False and f"{key}current" in data and f"{key}voltage" in data:
+            self._attr_native_value = (
+                data[f"{key}current"] * data[f"{key}voltage"])
+            if self._real is not True:
+                self._attr_native_value = round(
+                    self._attr_native_value, self._real)
+                if self._real == 0:
+                    self._attr_native_value = int(self._attr_native_value)
+        else:
+            super()._on_updated(data)
