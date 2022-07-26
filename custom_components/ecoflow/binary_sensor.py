@@ -84,7 +84,7 @@ class ChargingEntity(BinarySensorEntity, EcoFlowBaseEntity):
             self._attr_is_on = False
         elif self._battery_level is not None and self._battery_level_max is not None and self._battery_level_max < self._battery_level:
             self._attr_is_on = False
-        elif self._in_power is not None and self._out_power is not None and self._in_power < self._out_power:
+        elif self._in_power is not None and self._out_power is not None and self._in_power <= self._out_power:
             self._attr_is_on = False
         else:
             self._attr_is_on = True
