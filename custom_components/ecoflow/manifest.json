@@ -1,7 +1,7 @@
 {
   "domain": "ecoflow",
   "name": "Ecoflow",
-  "version": "2.1",
+  "version": "3.0.0",
   "documentation": "https://github.com/vwt12eh8/hassio-ecoflow",
   "issue_tracker": "https://github.com/vwt12eh8/hassio-ecoflow/issues",
   "requirements": [
