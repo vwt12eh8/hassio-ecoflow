@@ -101,7 +101,7 @@ class ExtraErrorEntity(BaseEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     def _on_updated(self, data: dict[str, Any]):
-        super()._on_updated(data)
+        self._attr_is_on = data[self._key] not in [0, 6]
         self._attr_extra_state_attributes = {"code": data[self._key]}
 
 
@@ -116,7 +116,7 @@ class MainErrorEntity(BinarySensorEntity, EcoFlowBaseEntity):
 
     @property
     def is_on(self):
-        return next((True for x in self._attr_extra_state_attributes.values() if x != 0), False)
+        return next((True for x in self._attr_extra_state_attributes.values() if x not in [0, 6]), False)
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
