@@ -72,9 +72,9 @@ class ChargingEntity(BinarySensorEntity, EcoFlowBaseEntity):
 
     def _on_updated(self, data: dict[str, Any]):
         if "in_power" in data:
-            self._in_power = bool(data["in_power"])
+            self._in_power = data["in_power"]
         if "out_power" in data:
-            self._out_power = bool(data["out_power"])
+            self._out_power = data["out_power"]
         if "battery_level" in data:
             self._battery_level = data["battery_level"]
         if "battery_level_max" in data:
@@ -82,9 +82,9 @@ class ChargingEntity(BinarySensorEntity, EcoFlowBaseEntity):
 
         if not self._in_power:
             self._attr_is_on = False
-        elif self._battery_level is not None and self._battery_level_max is not None and self._battery_level_max < self._battery_level:
+        elif (self._battery_level is not None) and (self._battery_level_max is not None) and (self._battery_level_max < self._battery_level):
             self._attr_is_on = False
-        elif self._in_power is not None and self._out_power is not None and self._in_power <= self._out_power:
+        elif (self._in_power is not None) and (self._out_power is not None) and (self._in_power <= self._out_power):
             self._attr_is_on = False
         else:
             self._attr_is_on = True
