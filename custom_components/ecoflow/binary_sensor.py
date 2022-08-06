@@ -8,36 +8,36 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowEntity, HassioEcoFlowClient,
+from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowDevice, EcoFlowEntity,
                select_bms)
 from .ecoflow import is_delta, is_power_station, is_river
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
+    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_power_station(client.product):
+    if is_power_station(device.product):
         entities.extend([
-            ChargingEntity(client),
-            MainErrorEntity(client),
+            ChargingEntity(device),
+            MainErrorEntity(device),
         ])
-        if is_delta(client.product):
+        if is_delta(device.product):
             entities.extend([
-                ExtraErrorEntity(client, client.bms.pipe(select_bms(
+                ExtraErrorEntity(device, device.bms.pipe(select_bms(
                     1), ops.share()), "battery_error", "Extra1 status", 1),
-                ExtraErrorEntity(client, client.bms.pipe(select_bms(
+                ExtraErrorEntity(device, device.bms.pipe(select_bms(
                     2), ops.share()), "battery_error", "Extra2 status", 2),
-                InputEntity(client, client.inverter, "ac_in_type", "AC input"),
-                InputEntity(client, client.mppt, "dc_in_state", "DC input"),
-                CustomChargeEntity(client, client.inverter,
+                InputEntity(device, device.inverter, "ac_in_type", "AC input"),
+                InputEntity(device, device.mppt, "dc_in_state", "DC input"),
+                CustomChargeEntity(device, device.inverter,
                                    "ac_in_limit_switch", "AC custom charge speed"),
             ])
-        if is_river(client.product):
+        if is_river(device.product):
             entities.extend([
-                ExtraErrorEntity(client, client.bms.pipe(select_bms(
+                ExtraErrorEntity(device, device.bms.pipe(select_bms(
                     1), ops.share()), "battery_error", "Extra status", 1),
-                InputEntity(client, client.inverter, "in_type", "Input"),
+                InputEntity(device, device.inverter, "in_type", "Input"),
             ])
 
     async_add_entities(entities)
@@ -55,15 +55,15 @@ class ChargingEntity(BinarySensorEntity, EcoFlowBaseEntity):
     _in_power = None
     _out_power = None
 
-    def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client)
+    def __init__(self, device: EcoFlowDevice):
+        super().__init__(device)
         self._attr_name = "Charging"
         self._attr_unique_id += "-in-charging"
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        self._subscribe(self._client.pd, self.__updated)
-        self._subscribe(self._client.ems, self.__updated)
+        self._subscribe(self._device.pd, self.__updated)
+        self._subscribe(self._device.ems, self.__updated)
 
     def __updated(self, data: dict[str, Any]):
         self._attr_available = True
@@ -108,8 +108,8 @@ class ExtraErrorEntity(BaseEntity):
 class MainErrorEntity(BinarySensorEntity, EcoFlowBaseEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
-    def __init__(self, client: HassioEcoFlowClient):
-        super().__init__(client)
+    def __init__(self, device: EcoFlowDevice):
+        super().__init__(device)
         self._attr_name = "Main status"
         self._attr_unique_id += "-error"
         self._attr_extra_state_attributes = {}
@@ -120,10 +120,10 @@ class MainErrorEntity(BinarySensorEntity, EcoFlowBaseEntity):
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        self._subscribe(self._client.pd, self.__updated)
-        self._subscribe(self._client.ems, self.__updated)
-        self._subscribe(self._client.inverter, self.__updated)
-        self._subscribe(self._client.mppt, self.__updated)
+        self._subscribe(self._device.pd, self.__updated)
+        self._subscribe(self._device.ems, self.__updated)
+        self._subscribe(self._device.inverter, self.__updated)
+        self._subscribe(self._device.mppt, self.__updated)
 
     def __updated(self, data: dict[str, Any]):
         self._attr_available = True

@@ -57,7 +57,7 @@ def select_bms(idx: int):
     )
 
 
-class HassioEcoFlowClient:
+class EcoFlowDevice:
     __disconnected = None
     __extra_connected = False
 
@@ -200,18 +200,18 @@ class EcoFlowBaseEntity(Entity):
     _attr_should_poll = False
     _connected = False
 
-    def __init__(self, client: HassioEcoFlowClient, bms_id: Optional[int] = None):
+    def __init__(self, device: EcoFlowDevice, bms_id: Optional[int] = None):
         self._attr_available = False
-        self._client = client
+        self._device = device
         self._bms_id = bms_id or 0
-        self._attr_device_info = client.device_info_main
-        self._attr_unique_id = client.serial
+        self._attr_device_info = device.device_info_main
+        self._attr_unique_id = device.serial
         if bms_id:
             self._attr_unique_id += f"-{bms_id}"
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        self._subscribe(self._client.disconnected, self.__on_disconnected)
+        self._subscribe(self._device.disconnected, self.__on_disconnected)
 
     def _subscribe(self, src: Observable, func: Callable):
         self.async_on_remove(src.subscribe(func).dispose)
@@ -226,8 +226,8 @@ class EcoFlowBaseEntity(Entity):
 
 
 class EcoFlowEntity(EcoFlowBaseEntity):
-    def __init__(self, client: HassioEcoFlowClient, src: Observable[dict[str, Any]], key: str, name: str, bms_id: Optional[int] = None):
-        super().__init__(client, bms_id)
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: Optional[int] = None):
+        super().__init__(device, bms_id)
         self._key = key
         self._src = src
         self._attr_name = name
@@ -250,14 +250,14 @@ class EcoFlowConfigEntity(EcoFlowBaseEntity):
     _attr_entity_category = EntityCategory.CONFIG
     _attr_should_poll = True
 
-    def __init__(self, client: HassioEcoFlowClient, key: str, name: str):
-        super().__init__(client)
+    def __init__(self, device: EcoFlowDevice, key: str, name: str):
+        super().__init__(device)
         self._attr_name = name
         self._attr_unique_id += f"-{key.replace('_', '-')}"
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        self._subscribe(self._client.received, self.__updated)
+        self._subscribe(self._device.received, self.__updated)
 
     def __updated(self, data):
         if not self._connected:
@@ -269,9 +269,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
-    client = HassioEcoFlowClient(hass, entry)
-
-    hass.data[DOMAIN][entry.entry_id] = client
+    hass.data[DOMAIN][entry.entry_id] = EcoFlowDevice(hass, entry)
     hass.config_entries.async_setup_platforms(entry, _PLATFORMS)
     return True
 
@@ -280,6 +278,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     if not await hass.config_entries.async_unload_platforms(entry, _PLATFORMS):
         return False
 
-    client: HassioEcoFlowClient = hass.data[DOMAIN].pop(entry.entry_id)
-    await client.close()
+    device: EcoFlowDevice = hass.data[DOMAIN].pop(entry.entry_id)
+    await device.close()
     return True

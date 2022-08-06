@@ -7,38 +7,38 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowEntity, HassioEcoFlowClient,
+from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowDevice, EcoFlowEntity,
                request)
 from .ecoflow import (is_delta, is_delta_max, is_delta_mini, is_delta_pro,
                       is_power_station, send)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
+    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_power_station(client.product):
+    if is_power_station(device.product):
         entities.extend([
-            DcInCurrentEntity(client, "dc_in_current_config",
+            DcInCurrentEntity(device, "dc_in_current_config",
                               "Car input"),
-            MaxLevelEntity(client, client.ems,
+            MaxLevelEntity(device, device.ems,
                            "battery_level_max", "Charge level"),
         ])
-        if is_delta(client.product):
+        if is_delta(device.product):
             entities.extend([
-                ChargeWattsEntity(client, client.inverter,
+                ChargeWattsEntity(device, device.inverter,
                                   "ac_in_limit_custom", "AC charge speed"),
-                LcdBrightnessEntity(client, client.pd,
+                LcdBrightnessEntity(device, device.pd,
                                     "lcd_brightness", "Screen brightness"),
-                MinLevelEntity(client, client.ems,
+                MinLevelEntity(device, device.ems,
                             "battery_level_min", "Discharge level"),
             ])
-            if is_delta_pro(client.product):
+            if is_delta_pro(device.product):
                 entities.extend([
                     GenerateStartEntity(
-                        client, client.ems, "generator_level_start", "Smart generator auto on"),
+                        device, device.ems, "generator_level_start", "Smart generator auto on"),
                     GenerateStopEntity(
-                        client, client.ems, "generator_level_stop", "Smart generator auto off"),
+                        device, device.ems, "generator_level_stop", "Smart generator auto off"),
                 ])
 
     async_add_entities(entities)
@@ -59,13 +59,13 @@ class ChargeWattsEntity(BaseEntity):
     _attr_native_unit_of_measurement = POWER_WATT
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_ac_in_limit(int(value)))
+        self._device.tcp.write(send.set_ac_in_limit(int(value)))
 
     def _on_updated(self, data: dict[str, Any]):
         super()._on_updated(data)
         voltage: float = data["ac_out_voltage_config"]
-        if is_delta_max(self._client.product):
-            if self._client.serial.startswith("DD"):
+        if is_delta_max(self._device.product):
+            if self._device.serial.startswith("DD"):
                 self._attr_native_max_value = 1600
             elif voltage >= 220:
                 self._attr_native_max_value = 2000
@@ -75,7 +75,7 @@ class ChargeWattsEntity(BaseEntity):
                 self._attr_native_max_value = 1650
             else:
                 self._attr_native_max_value = 1500
-        elif is_delta_pro(self._client.product):
+        elif is_delta_pro(self._device.product):
             if voltage >= 240:
                 self._attr_native_max_value = 3000
             elif voltage >= 230:
@@ -88,7 +88,7 @@ class ChargeWattsEntity(BaseEntity):
                 self._attr_native_max_value = 1650
             else:
                 self._attr_native_max_value = 1500
-        elif is_delta_mini(self._client.product):
+        elif is_delta_mini(self._device.product):
             self._attr_native_max_value = 900
         else:
             self._attr_native_max_value = 1500
@@ -102,15 +102,15 @@ class DcInCurrentEntity(NumberEntity, EcoFlowConfigEntity):
     _attr_native_unit_of_measurement = ELECTRIC_CURRENT_AMPERE
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_dc_in_current(
-            self._client.product, int(value * 1000)))
+        self._device.tcp.write(send.set_dc_in_current(
+            self._device.product, int(value * 1000)))
 
     async def async_update(self):
         try:
-            value = await request(self._client.tcp, send.get_dc_in_current(self._client.product), self._client.dc_in_current_config)
+            value = await request(self._device.tcp, send.get_dc_in_current(self._device.product), self._device.dc_in_current_config)
         except:
             return
-        self._client.diagnostics["dc_in_current_config"] = value
+        self._device.diagnostics["dc_in_current_config"] = value
         self._attr_native_value = int(value / 1000)
         self._attr_available = True
 
@@ -123,7 +123,7 @@ class GenerateStartEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_generate_start(int(value)))
+        self._device.tcp.write(send.set_generate_start(int(value)))
 
 
 class GenerateStopEntity(BaseEntity):
@@ -134,7 +134,7 @@ class GenerateStopEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_generate_stop(int(value)))
+        self._device.tcp.write(send.set_generate_stop(int(value)))
 
 
 class LcdBrightnessEntity(BaseEntity):
@@ -148,8 +148,8 @@ class LcdBrightnessEntity(BaseEntity):
         self._attr_native_value = data[self._key] & 0x7F
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_lcd(
-            self._client.product, light=int(value)))
+        self._device.tcp.write(send.set_lcd(
+            self._device.product, light=int(value)))
 
 
 class MaxLevelEntity(BaseEntity):
@@ -160,8 +160,8 @@ class MaxLevelEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_level_max(
-            self._client.product, int(value)))
+        self._device.tcp.write(send.set_level_max(
+            self._device.product, int(value)))
 
 
 class MinLevelEntity(BaseEntity):
@@ -172,4 +172,4 @@ class MinLevelEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
 
     async def async_set_native_value(self, value: float):
-        self._client.tcp.write(send.set_level_min(int(value)))
+        self._device.tcp.write(send.set_level_min(int(value)))

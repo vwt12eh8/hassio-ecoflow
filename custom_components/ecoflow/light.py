@@ -7,23 +7,23 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowEntity, HassioEcoFlowClient, select_bms
+from . import DOMAIN, EcoFlowDevice, EcoFlowEntity, select_bms
 from .ecoflow import is_river, send
 
 _EFFECTS = ["Low", "High", "SOS"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    client: HassioEcoFlowClient = hass.data[DOMAIN][entry.entry_id]
+    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_river(client.product):
+    if is_river(device.product):
         entities.extend([
-            LedEntity(client, client.pd, "light_state", "Light"),
+            LedEntity(device, device.pd, "light_state", "Light"),
         ])
-        if client.product == 5:  # RIVER Max
+        if device.product == 5:  # RIVER Max
             entities.extend([
-                AmbientEntity(client, client.bms.pipe(
+                AmbientEntity(device, device.bms.pipe(
                     select_bms(1)), "ambient", "Ambient light", 1),
             ])
 
@@ -39,7 +39,7 @@ class AmbientEntity(LightEntity, EcoFlowEntity):
     _last_mode = 1
 
     async def async_turn_off(self, **kwargs):
-        self._client.tcp.write(send.set_ambient(0))
+        self._device.tcp.write(send.set_ambient(0))
 
     async def async_turn_on(self, brightness=None, rgb_color=None, effect=None, **kwargs):
         if brightness is None:
@@ -58,7 +58,7 @@ class AmbientEntity(LightEntity, EcoFlowEntity):
         else:
             effect = self._attr_effect_list.index(effect)
 
-        self._client.tcp.write(send.set_ambient(
+        self._device.tcp.write(send.set_ambient(
             self._last_mode, effect, rgb_color, brightness))
 
     def _on_updated(self, data: dict[str, Any]):
@@ -91,10 +91,10 @@ class LedEntity(LightEntity, EcoFlowEntity):
             self._attr_effect = None
 
     async def async_turn_off(self, **kwargs):
-        self._client.tcp.write(send.set_light(self._client.product, 0))
+        self._device.tcp.write(send.set_light(self._device.product, 0))
 
     async def async_turn_on(self, effect: str = None, **kwargs):
         if not effect:
             effect = self.effect or _EFFECTS[0]
-        self._client.tcp.write(send.set_light(
-            self._client.product, _EFFECTS.index(effect) + 1))
+        self._device.tcp.write(send.set_light(
+            self._device.product, _EFFECTS.index(effect) + 1))
