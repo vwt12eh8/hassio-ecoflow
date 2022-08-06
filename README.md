@@ -22,16 +22,16 @@ Two methods are available, and you can choose one or the other.
 
 Once installed, after restarting Home Assistant, you can start integration as usual from Add Integration.
 
-## Tested products
-- [ ] RIVER Mini (Not impl)
-- [x] RIVER Max
-- [x] RIVER Pro
-  - [x] Extra Battery
-- [ ] DELTA Mini
-- [x] DELTA Max ([#12](https://github.com/vwt12eh8/hassio-ecoflow/issues/12))
-  - [ ] Extra Battery
-- [x] DELTA Pro
-  - [ ] Extra Battery
+## Supported products
+- ~~RIVER Mini~~ (Coming soon)
+- RIVER Max
+- RIVER Pro
+  - Extra Battery
+- DELTA Mini
+- DELTA Max
+  - with Extra Battery
+- DELTA Pro (Wi-Fi only)
+  - with Extra Battery
 
 ## How to register for the Energy Dashboard
 With this integration, total input and total output energy can be obtained from the device in AC and DC respectively.
