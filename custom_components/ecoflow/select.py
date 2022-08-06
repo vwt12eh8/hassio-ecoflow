@@ -7,8 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowConfigEntity, EcoFlowDevice, EcoFlowEntity
-from .ecoflow import is_delta, is_power_station, is_river, send
+from . import DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice, EcoFlowEntity
+from .ecoflow import is_delta, is_river, send
 
 _AC_OPTIONS = {
     "Never": 0,
@@ -56,10 +56,10 @@ _STANDBY_OPTIONS = {
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
+    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_power_station(device.product):
+    def device_added(device: EcoFlowDevice):
         entities.extend([
             AcTimeoutEntity(device, device.inverter,
                             "ac_out_timeout", "AC timeout"),
@@ -78,8 +78,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 DcInTypeEntity(device),
                 LcdTimeoutPollEntity(device, "lcd_timeout", "Screen timeout"),
             ])
+        async_add_entities(entities)
 
-    async_add_entities(entities)
+    entry.async_on_unload(data.device_added.subscribe(device_added).dispose)
+    for device in data.devices.values():
+        device_added(device)
 
 
 class AcTimeoutEntity(SelectEntity, EcoFlowEntity):

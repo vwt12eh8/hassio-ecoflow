@@ -6,15 +6,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowDevice, EcoFlowEntity, select_bms
-from .ecoflow import is_delta, is_power_station, is_river, is_river_mini, send
+from . import DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity, select_bms
+from .ecoflow import is_delta, is_river, is_river_mini, send
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
+    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_power_station(device.product):
+    def device_added(device: EcoFlowDevice):
         entities.extend([
             AcEntity(device, device.inverter, "ac_out_state", "AC output"),
             BeepEntity(device, device.pd, "beep", "Beep"),
@@ -45,8 +45,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 XBoostEntity(device, device.inverter,
                              "ac_out_xboost", "AC X-Boost"),
             ])
+        async_add_entities(entities)
 
-    async_add_entities(entities)
+    entry.async_on_unload(data.device_added.subscribe(device_added).dispose)
+    for device in data.devices.values():
+        device_added(device)
 
 
 class SimpleEntity(SwitchEntity, EcoFlowEntity):

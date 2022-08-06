@@ -3,7 +3,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import DOMAIN, EcoFlowDevice
+from . import DOMAIN, EcoFlowData
 
 
 def _to_serializable(x):
@@ -16,9 +16,12 @@ def _to_serializable(x):
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry):
-    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
-    values = {}
-    for i in device.diagnostics:
-        d = device.diagnostics[i]
-        values[i] = _to_serializable(d)
-    return values
+    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
+    devices = {}
+    for device in data.devices.values():
+        values = {}
+        for i in device.diagnostics:
+            d = device.diagnostics[i]
+            values[i] = _to_serializable(d)
+        devices[device.serial] = values
+    return devices

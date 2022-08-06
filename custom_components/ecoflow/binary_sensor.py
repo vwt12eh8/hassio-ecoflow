@@ -8,16 +8,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowDevice, EcoFlowEntity,
-               select_bms)
-from .ecoflow import is_delta, is_power_station, is_river
+from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowData, EcoFlowDevice,
+               EcoFlowEntity, select_bms)
+from .ecoflow import is_delta, is_river
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
+    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_power_station(device.product):
+    def device_added(device: EcoFlowDevice):
         entities.extend([
             ChargingEntity(device),
             MainErrorEntity(device),
@@ -39,8 +39,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     1), ops.share()), "battery_error", "Extra status", 1),
                 InputEntity(device, device.inverter, "in_type", "Input"),
             ])
+        async_add_entities(entities)
 
-    async_add_entities(entities)
+    entry.async_on_unload(data.device_added.subscribe(device_added).dispose)
+    for device in data.devices.values():
+        device_added(device)
 
 
 class BaseEntity(BinarySensorEntity, EcoFlowEntity):

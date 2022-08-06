@@ -59,6 +59,12 @@ def select_bms(idx: int):
     )
 
 
+class EcoFlowData:
+    def __init__(self):
+        self.device_added = Subject[EcoFlowDevice]()
+        self.devices = dict[str, EcoFlowDevice]()
+
+
 class EcoFlowDevice:
     __disconnected = None
     __extra_connected = False
@@ -277,8 +283,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
-    hass.data[DOMAIN][entry.entry_id] = EcoFlowDevice(hass, entry)
+    data = EcoFlowData()
+    hass.data[DOMAIN][entry.entry_id] = data
+
+    device = EcoFlowDevice(hass, entry)
+    data.devices[device.serial] = device
+
     hass.config_entries.async_setup_platforms(entry, _PLATFORMS)
+
     return True
 
 
@@ -286,6 +298,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     if not await hass.config_entries.async_unload_platforms(entry, _PLATFORMS):
         return False
 
-    device: EcoFlowDevice = hass.data[DOMAIN].pop(entry.entry_id)
-    await device.close()
+    data: EcoFlowData = hass.data[DOMAIN].pop(entry.entry_id)
+
+    for device in data.devices.values():
+        await device.close()
+
     return True

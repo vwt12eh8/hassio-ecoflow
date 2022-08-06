@@ -7,27 +7,31 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowDevice, EcoFlowEntity, select_bms
+from . import DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity, select_bms
 from .ecoflow import is_river, send
 
 _EFFECTS = ["Low", "High", "SOS"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    device: EcoFlowDevice = hass.data[DOMAIN][entry.entry_id]
+    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
     entities = []
 
-    if is_river(device.product):
-        entities.extend([
-            LedEntity(device, device.pd, "light_state", "Light"),
-        ])
-        if device.product == 5:  # RIVER Max
+    def device_added(device: EcoFlowDevice):
+        if is_river(device.product):
             entities.extend([
-                AmbientEntity(device, device.bms.pipe(
-                    select_bms(1)), "ambient", "Ambient light", 1),
+                LedEntity(device, device.pd, "light_state", "Light"),
             ])
+            if device.product == 5:  # RIVER Max
+                entities.extend([
+                    AmbientEntity(device, device.bms.pipe(
+                        select_bms(1)), "ambient", "Ambient light", 1),
+                ])
+        async_add_entities(entities)
 
-    async_add_entities(entities)
+    entry.async_on_unload(data.device_added.subscribe(device_added).dispose)
+    for device in data.devices.values():
+        device_added(device)
 
 
 class AmbientEntity(LightEntity, EcoFlowEntity):
