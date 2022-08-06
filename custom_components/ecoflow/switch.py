@@ -58,10 +58,10 @@ class AcEntity(SimpleEntity):
     _attr_device_class = SwitchDeviceClass.OUTLET
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_out(self._device.product, False))
+        self._device.send(send.set_ac_out(self._device.product, False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_out(self._device.product, True))
+        self._device.send(send.set_ac_out(self._device.product, True))
 
 
 class AcPauseEntity(SimpleEntity):
@@ -71,10 +71,10 @@ class AcPauseEntity(SimpleEntity):
         self._attr_is_on = not bool(data[self._key])
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_in_limit(pause=True))
+        self._device.send(send.set_ac_in_limit(pause=True))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_in_limit(pause=False))
+        self._device.send(send.set_ac_in_limit(pause=False))
 
 
 class AcSlowChargeEntity(SimpleEntity):
@@ -82,10 +82,10 @@ class AcSlowChargeEntity(SimpleEntity):
     _attr_icon = "mdi:car-speed-limiter"
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_in_slow(False))
+        self._device.send(send.set_ac_in_slow(False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_in_slow(True))
+        self._device.send(send.set_ac_in_slow(True))
 
 
 class AmbientSyncEntity(SimpleEntity):
@@ -96,10 +96,10 @@ class AmbientSyncEntity(SimpleEntity):
         return "mdi:sync-off" if self.is_on is False else "mdi:sync"
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ambient(2))
+        self._device.send(send.set_ambient(2))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ambient(1))
+        self._device.send(send.set_ambient(1))
 
     def _on_updated(self, data: dict[str, Any]):
         if data[self._key] == 1:
@@ -121,20 +121,20 @@ class BeepEntity(SimpleEntity):
         self._attr_is_on = not bool(data[self._key])
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_beep(False))
+        self._device.send(send.set_beep(False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_beep(True))
+        self._device.send(send.set_beep(True))
 
 
 class DcEntity(SimpleEntity):
     _attr_device_class = SwitchDeviceClass.OUTLET
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_dc_out(self._device.product, False))
+        self._device.send(send.set_dc_out(self._device.product, False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_dc_out(self._device.product, True))
+        self._device.send(send.set_dc_out(self._device.product, True))
 
 
 class FanAutoEntity(SimpleEntity):
@@ -145,10 +145,10 @@ class FanAutoEntity(SimpleEntity):
         return "mdi:fan-auto" if self.is_on else "mdi:fan-chevron-up"
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_fan_auto(self._device.product, False))
+        self._device.send(send.set_fan_auto(self._device.product, False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_fan_auto(self._device.product, True))
+        self._device.send(send.set_fan_auto(self._device.product, True))
 
     def _on_updated(self, data: dict[str, Any]):
         self._attr_is_on = data[self._key] == 1
@@ -165,20 +165,20 @@ class LcdAutoEntity(SimpleEntity):
 
     async def async_turn_off(self, **kwargs: Any):
         value = self._brightness
-        self._device.tcp.write(send.set_lcd(self._device.product, light=value))
+        self._device.send(send.set_lcd(self._device.product, light=value))
 
     async def async_turn_on(self, **kwargs: Any):
         value = self._brightness | 0x80
-        self._device.tcp.write(send.set_lcd(self._device.product, light=value))
+        self._device.send(send.set_lcd(self._device.product, light=value))
 
 
 class XBoostEntity(SimpleEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     async def async_turn_off(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_out(
+        self._device.send(send.set_ac_out(
             self._device.product, xboost=False))
 
     async def async_turn_on(self, **kwargs: Any):
-        self._device.tcp.write(send.set_ac_out(
+        self._device.send(send.set_ac_out(
             self._device.product, xboost=True))

@@ -39,7 +39,7 @@ class AmbientEntity(LightEntity, EcoFlowEntity):
     _last_mode = 1
 
     async def async_turn_off(self, **kwargs):
-        self._device.tcp.write(send.set_ambient(0))
+        self._device.send(send.set_ambient(0))
 
     async def async_turn_on(self, brightness=None, rgb_color=None, effect=None, **kwargs):
         if brightness is None:
@@ -58,7 +58,7 @@ class AmbientEntity(LightEntity, EcoFlowEntity):
         else:
             effect = self._attr_effect_list.index(effect)
 
-        self._device.tcp.write(send.set_ambient(
+        self._device.send(send.set_ambient(
             self._last_mode, effect, rgb_color, brightness))
 
     def _on_updated(self, data: dict[str, Any]):
@@ -91,10 +91,10 @@ class LedEntity(LightEntity, EcoFlowEntity):
             self._attr_effect = None
 
     async def async_turn_off(self, **kwargs):
-        self._device.tcp.write(send.set_light(self._device.product, 0))
+        self._device.send(send.set_light(self._device.product, 0))
 
     async def async_turn_on(self, effect: str = None, **kwargs):
         if not effect:
             effect = self.effect or _EFFECTS[0]
-        self._device.tcp.write(send.set_light(
+        self._device.send(send.set_light(
             self._device.product, _EFFECTS.index(effect) + 1))

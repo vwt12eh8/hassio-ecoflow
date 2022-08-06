@@ -62,7 +62,7 @@ class EcoFlowDevice:
     __extra_connected = False
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        self.tcp = RxTcpAutoConnection(entry.data[CONF_HOST], ef.PORT)
+        self._tcp = RxTcpAutoConnection(entry.data[CONF_HOST], ef.PORT)
         self.product: int = entry.data[CONF_PRODUCT]
         self.serial = entry.unique_id
         self.diagnostics = dict[str, dict[str, Any]]()
@@ -78,7 +78,7 @@ class EcoFlowDevice:
                 (CONNECTION_NETWORK_MAC, mac),
             }
 
-        self.received = self.tcp.received.pipe(
+        self.received = self._tcp.received.pipe(
             receive.merge_packet(),
             ops.map(receive.decode_packet),
             ops.share(),
@@ -135,7 +135,7 @@ class EcoFlowDevice:
 
         def _disconnected(*args):
             self.__disconnected = None
-            self.tcp.reconnect()
+            self._tcp.reconnect()
             self.diagnostics.clear()
             self.disconnected.on_next(None)
             if self.__extra_connected:
@@ -191,8 +191,14 @@ class EcoFlowDevice:
         self.mppt.subscribe(mppt_updated)
 
     async def close(self):
-        self.tcp.close()
-        await self.tcp.wait_closed()
+        self._tcp.close()
+        await self._tcp.wait_closed()
+
+    async def request(self, req: bytes, res: Observable[_T]):
+        return await request(self._tcp, req, res)
+
+    def send(self, data: bytes):
+        self._tcp.write(data)
 
 
 class EcoFlowBaseEntity(Entity):
