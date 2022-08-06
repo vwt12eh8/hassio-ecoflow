@@ -14,7 +14,7 @@ from reactivex import Observable, Subject, compose, throw
 from reactivex.subject.replaysubject import ReplaySubject
 
 from . import ecoflow as ef
-from .ecoflow import receive
+from .ecoflow import receive, send
 from .ecoflow.rxtcp import RxTcpAutoConnection
 
 CONF_PRODUCT = "product"
@@ -66,6 +66,8 @@ class HassioEcoFlowClient:
         self.product: int = entry.data[CONF_PRODUCT]
         self.serial = entry.unique_id
         self.diagnostics = dict[str, dict[str, Any]]()
+        self.diagnostics["serial_main"] = set[str]()
+        self.diagnostics["serial_extra"] = set[str]()
         dr = async_get_dr(hass)
 
         self.device_info_main = DeviceInfo(
@@ -113,6 +115,13 @@ class HassioEcoFlowClient:
             ops.multicast(subject=ReplaySubject(1, DISCONNECT_TIME)),
             ops.ref_count(),
         )
+
+        def diag_serial(x: tuple[int, int, int, bytes]):
+            if receive.is_serial_main(x):
+                self.diagnostics["serial_main"].add(x[3].hex())
+            elif receive.is_serial_extra(x):
+                self.diagnostics["serial_extra"].add(x[3].hex())
+        self.received.subscribe(diag_serial)
 
         self.dc_in_current_config = self.received.pipe(
             ops.filter(receive.is_dc_in_current_config),
@@ -170,6 +179,8 @@ class HassioEcoFlowClient:
                 self.__extra_connected = not self.__extra_connected
                 if not self.__extra_connected:
                     self.disconnected.on_next(1)
+            self.tcp.write(send.get_serial_extra())
+            self.tcp.write(send.get_serial_main())
         self.pd.subscribe(pd_updated)
 
         def bms_updated(data: tuple[int, dict[str, Any]]):
