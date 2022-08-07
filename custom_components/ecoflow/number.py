@@ -13,16 +13,15 @@ from .ecoflow import is_delta, is_delta_max, is_delta_mini, is_delta_pro, send
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities.extend([
+        entities = [
             DcInCurrentEntity(device, "dc_in_current_config",
                               "Car input"),
             MaxLevelEntity(device, device.ems,
                            "battery_level_max", "Charge level"),
-        ])
+        ]
         if is_delta(device.product):
             entities.extend([
                 ChargeWattsEntity(device, device.inverter,

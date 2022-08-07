@@ -10,30 +10,34 @@ from .ecoflow.rxtcp import RxTcpAutoConnection
 
 
 class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
-    VERSION = 1
+    VERSION = 2
     host = None
     mac = None
 
     async def _get_serial_main(self):
-        tcp = RxTcpAutoConnection(self.host, PORT)
-        received = tcp.received.pipe(
-            receive.merge_packet(),
-            ops.map(receive.decode_packet),
-            ops.filter(receive.is_serial_main),
-            ops.map(lambda x: receive.parse_serial(x[3])),
-        )
-        try:
+        async with RxTcpAutoConnection(self.host, PORT) as tcp:
+            received = tcp.received.pipe(
+                receive.merge_packet(),
+                ops.map(receive.decode_packet),
+                ops.filter(receive.is_serial_main),
+                ops.map(lambda x: receive.parse_serial(x[3])),
+            )
             await tcp.wait_opened()
             info = await request(tcp, send.get_serial_main(), received)
-        finally:
-            tcp.close()
+
         if info["product"] not in PRODUCTS:
             return self.async_abort(reason="product_unsupported")
-        await self.async_set_unique_id(info["serial"])
-        self._abort_if_unique_id_configured(updates={
-            CONF_HOST: self.host,
-            CONF_MAC: self.mac,
-        })
+
+        serial = info["serial"]
+        entry = await self.async_set_unique_id(DOMAIN, raise_on_progress=False)
+        if entry and serial in entry.data:
+            data = dict(entry.data[serial])
+            data[CONF_HOST] = self.host
+            if self.mac:
+                data[CONF_MAC] = self.mac
+            self._abort_if_unique_id_configured({serial: data}, False)
+        await self.async_set_unique_id(serial)
+
         return info
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
@@ -53,16 +57,23 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
             except TimeoutError:
                 errors["base"] = "timeout"
             else:
-                pn = PRODUCTS.get(info["product"], "")
-                if pn != "":
-                    pn += " "
+                serial = info["serial"]
+                entry = await self.async_set_unique_id(DOMAIN, raise_on_progress=False)
+                if entry and serial in entry.data:
+                    data = dict(entry.data[serial])
+                else:
+                    data = {}
+                data.update({
+                    CONF_HOST: self.host,
+                    CONF_PRODUCT: info["product"],
+                })
+                if self.mac:
+                    data[CONF_MAC] = self.mac
+
+                self._abort_if_unique_id_configured({serial: data}, False)
                 return self.async_create_entry(
-                    title=f'{pn}{info["serial"][-6:]}',
-                    data={
-                        CONF_HOST: self.host,
-                        CONF_MAC: self.mac,
-                        CONF_PRODUCT: info["product"],
-                    },
+                    title="",
+                    data=data,
                 )
 
         return self.async_show_form(

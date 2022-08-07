@@ -8,7 +8,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import event
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+from homeassistant.helpers.device_registry import (CONNECTION_NETWORK_MAC,
+                                                   DeviceEntry)
 from homeassistant.helpers.device_registry import async_get as async_get_dr
 from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 from homeassistant.util.dt import utcnow
@@ -69,19 +70,20 @@ class EcoFlowDevice:
     __disconnected = None
     __extra_connected = False
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        self._tcp = RxTcpAutoConnection(entry.data[CONF_HOST], ef.PORT)
-        self.product: int = entry.data[CONF_PRODUCT]
-        self.serial = entry.unique_id
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, serial: str):
+        data = entry.data[serial]
+        self._tcp = RxTcpAutoConnection(data[CONF_HOST], ef.PORT)
+        self.product: int = data[CONF_PRODUCT]
+        self.serial = serial
         self.diagnostics = dict[str, dict[str, Any]]()
         dr = async_get_dr(hass)
 
         self.device_info_main = DeviceInfo(
             identifiers={(DOMAIN, self.serial)},
             manufacturer="EcoFlow",
-            name=entry.title,
+            name=f"{ef.get_model_name(self.product)} {serial[-6:]}",
         )
-        if mac := entry.data.get(CONF_MAC, None):
+        if mac := data.get(CONF_MAC, None):
             self.device_info_main["connections"] = {
                 (CONNECTION_NETWORK_MAC, mac),
             }
@@ -279,17 +281,32 @@ class EcoFlowConfigEntity(EcoFlowBaseEntity):
             self.async_schedule_update_ha_state(True)
 
 
+async def _entry_updated(hass: HomeAssistant, entry: ConfigEntry):
+    data: EcoFlowData = hass.data[DOMAIN]
+
+    for serial in list(data.devices):
+        if serial in entry.data:
+            continue
+        device = data.devices.pop(serial)
+        entry.async_create_task(hass, device.close())
+
+    for serial in entry.data:
+        if serial in data.devices:
+            continue
+        device = EcoFlowDevice(hass, entry, serial)
+        data.devices[serial] = device
+        data.device_added.on_next(device)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
+    if entry.unique_id != DOMAIN:
+        return False
 
-    data = EcoFlowData()
-    hass.data[DOMAIN][entry.entry_id] = data
-
-    device = EcoFlowDevice(hass, entry)
-    data.devices[device.serial] = device
-
+    hass.data[DOMAIN] = EcoFlowData()
     hass.config_entries.async_setup_platforms(entry, _PLATFORMS)
+
+    entry.async_on_unload(entry.add_update_listener(_entry_updated))
+    entry.async_create_task(hass, _entry_updated(hass, entry))
 
     return True
 
@@ -298,9 +315,43 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     if not await hass.config_entries.async_unload_platforms(entry, _PLATFORMS):
         return False
 
-    data: EcoFlowData = hass.data[DOMAIN].pop(entry.entry_id)
+    data: EcoFlowData = hass.data[DOMAIN]
 
     for device in data.devices.values():
         await device.close()
 
+    hass.data.pop(DOMAIN)
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry):
+    if entry.version == 1:
+        de = next((x for x in hass.config_entries.async_entries(
+            DOMAIN) if x.unique_id == DOMAIN), None)
+        if de:
+            data = dict(de.data)
+            data[entry.unique_id] = dict(entry.data)
+            title = de.title
+        else:
+            data = {entry.unique_id: dict(entry.data)}
+            de = entry
+            de.version = 2
+            title = ""
+        hass.config_entries.async_update_entry(
+            de, data=data, title=title, unique_id=DOMAIN)
+        if de != entry:
+            await hass.config_entries.async_remove(entry.entry_id)
+    return True
+
+
+async def async_remove_config_entry_device(hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry):
+    serial = next((x[1] for x in device.identifiers if x[0] == DOMAIN), None)
+    if not serial:
+        return False
+    if serial not in entry.data:
+        return True
+
+    data = dict(entry.data)
+    data.pop(serial)
+    hass.config_entries.async_update_entry(entry, data=data)
     return True

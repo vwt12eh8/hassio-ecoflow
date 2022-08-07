@@ -22,11 +22,10 @@ from .ecoflow import is_delta, is_delta_mini, is_delta_pro, is_river
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities.extend([
+        entities = [
             CurrentEntity(device, device.inverter,
                           "ac_in_current", "AC input current"),
             CurrentEntity(device, device.inverter,
@@ -63,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         "USB-A left output"),
             WattsEntity(device, device.pd, "usb_out2_power",
                         "USB-A right output"),
-        ])
+        ]
         if is_delta(device.product):
             bms = (
                 device.bms.pipe(select_bms(0), ops.share()),

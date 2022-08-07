@@ -7,7 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice, EcoFlowEntity
+from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice,
+               EcoFlowEntity)
 from .ecoflow import is_delta, is_river, send
 
 _AC_OPTIONS = {
@@ -56,18 +57,17 @@ _STANDBY_OPTIONS = {
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities.extend([
+        entities = [
             AcTimeoutEntity(device, device.inverter,
                             "ac_out_timeout", "AC timeout"),
             FreqEntity(device, device.inverter,
                        "ac_out_freq_config", "AC frequency"),
             StandbyTimeoutEntity(
                 device, device.pd, "standby_timeout", "Unit timeout"),
-        ])
+        ]
         if is_delta(device.product):
             entities.extend([
                 LcdTimeoutPushEntity(device, device.pd,

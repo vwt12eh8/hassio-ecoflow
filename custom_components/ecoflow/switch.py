@@ -11,14 +11,13 @@ from .ecoflow import is_delta, is_river, is_river_mini, send
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities.extend([
+        entities = [
             AcEntity(device, device.inverter, "ac_out_state", "AC output"),
             BeepEntity(device, device.pd, "beep", "Beep"),
-        ])
+        ]
         if is_delta(device.product):
             entities.extend([
                 AcPauseEntity(device, device.inverter,

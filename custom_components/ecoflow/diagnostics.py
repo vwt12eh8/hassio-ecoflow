@@ -16,7 +16,7 @@ def _to_serializable(x):
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
+    data: EcoFlowData = hass.data[DOMAIN]
     devices = {}
     for device in data.devices.values():
         values = {}

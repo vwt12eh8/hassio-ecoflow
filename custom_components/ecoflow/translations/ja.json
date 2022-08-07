@@ -2,6 +2,7 @@
   "title": "EcoFlow",
   "config": {
     "abort": {
+      "already_configured": "デバイスを追加/更新しました。",
       "product_unsupported": "現時点では、この製品はサポートされていません。"
     },
     "error": {
@@ -10,7 +11,7 @@
     "step": {
       "user": {
         "data": {
-          "host": "ホスト名またはIPアドレス"
+          "host": "IPアドレス"
         }
       }
     }

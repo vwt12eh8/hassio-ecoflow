@@ -14,10 +14,10 @@ _EFFECTS = ["Low", "High", "SOS"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    data: EcoFlowData = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
+        entities = []
         if is_river(device.product):
             entities.extend([
                 LedEntity(device, device.pd, "light_state", "Light"),
