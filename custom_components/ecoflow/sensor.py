@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any
 
 import reactivex.operators as ops
 from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
@@ -224,7 +226,7 @@ class LevelEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: Optional[int] = None):
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: int | None = None):
         super().__init__(device, src, key, name, bms_id)
         self._attr_extra_state_attributes = {}
 
@@ -271,7 +273,7 @@ class WattsEntity(BaseEntity):
     _attr_native_unit_of_measurement = POWER_WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, real: Union[bool, int] = False):
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, real: bool | int = False):
         super().__init__(device, src, key, name)
         if key.endswith("_consumption"):
             self._key = key[:-11] + "out_power"

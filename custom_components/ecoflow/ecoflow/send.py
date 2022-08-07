@@ -1,11 +1,11 @@
-from typing import Optional
+from __future__ import annotations
 
 from . import calcCrc8, calcCrc16, is_delta, is_river_mini
 
 NO_USB_SWITCH = {5, 7, 12, 14, 15, 18}
 
 
-def _btoi(b: Optional[bool]):
+def _btoi(b: bool | None):
     if b is None:
         return 255
     return 1 if b else 0

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import struct
 from datetime import timedelta
-from typing import Any, Callable, Iterable, Optional, TypedDict, cast
+from typing import Any, Callable, Iterable, TypedDict, cast
 
 from reactivex import Observable, Observer
 
@@ -16,11 +18,11 @@ class Serial(TypedDict):
     cpu_id: str
 
 
-def _merge_packet(obs: Observable[Optional[bytes]]):
+def _merge_packet(obs: Observable[bytes | None]):
     def func(sub: Observer[bytes], sched=None):
         x = b''
 
-        def next(rcv: Optional[bytes]):
+        def next(rcv: bytes | None):
             nonlocal x
             if rcv is None:
                 x = b''

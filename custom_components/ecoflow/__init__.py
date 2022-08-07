@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import timedelta
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, TypeVar, cast
 
 import reactivex.operators as ops
 from homeassistant.config_entries import ConfigEntry
@@ -131,7 +133,7 @@ class EcoFlowDevice:
             ops.map(lambda x: receive.parse_lcd_timeout(x[3])),
         )
 
-        self.disconnected = Subject[Optional[int]]()
+        self.disconnected = Subject[int | None]()
 
         def _disconnected(*args):
             self.__disconnected = None
@@ -206,7 +208,7 @@ class EcoFlowBaseEntity(Entity):
     _attr_should_poll = False
     _connected = False
 
-    def __init__(self, device: EcoFlowDevice, bms_id: Optional[int] = None):
+    def __init__(self, device: EcoFlowDevice, bms_id: int | None = None):
         self._attr_available = False
         self._device = device
         self._bms_id = bms_id or 0
@@ -222,7 +224,7 @@ class EcoFlowBaseEntity(Entity):
     def _subscribe(self, src: Observable, func: Callable):
         self.async_on_remove(src.subscribe(func).dispose)
 
-    def __on_disconnected(self, bms_id: Optional[int]):
+    def __on_disconnected(self, bms_id: int | None):
         if bms_id is not None and self._bms_id != bms_id:
             return
         self._connected = False
@@ -232,7 +234,7 @@ class EcoFlowBaseEntity(Entity):
 
 
 class EcoFlowEntity(EcoFlowBaseEntity):
-    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: Optional[int] = None):
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: int | None = None):
         super().__init__(device, bms_id)
         self._key = key
         self._src = src

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from asyncio import Future, create_task, open_connection, sleep
 from logging import getLogger
-from typing import Optional
 
 from reactivex import Subject
 
@@ -14,7 +15,7 @@ class RxTcpAutoConnection:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.received = Subject[Optional[bytes]]()
+        self.received = Subject[bytes | None]()
         self.__is_open = True
         self.__task = create_task(self.__loop())
         self.__opened = Future()
