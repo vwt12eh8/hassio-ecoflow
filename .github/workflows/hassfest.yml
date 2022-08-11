@@ -2,6 +2,9 @@ name: Validate with hassfest
 
 on:
   push:
+    branches: [ "main", "ver*" ]
+  pull_request:
+    branches: [ "main", "ver*" ]
 
 jobs:
   validate:
