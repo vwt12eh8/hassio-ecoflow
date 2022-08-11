@@ -77,7 +77,7 @@ class EcoFlowDevice(ABC):
     serial: str
 
     def __init__(self):
-        self.disconnected = Subject[int | None]()
+        self.disconnected = Subject[None]()
 
     @abstractmethod
     async def request(self, req: bytes, res: Observable[_T]) -> _T:
@@ -150,10 +150,9 @@ class EcoFlowMainDevice(EcoFlowDevice):
             ops.ref_count(),
         )
         self.bms = self._bms.pipe(select_bms(0))
-        if ef.is_river(self.product):
-            self._bms.pipe(
-                ops.filter(lambda x: x[0] != 0),
-            ).subscribe(lambda x: hass.create_task(self._bms_updated(*x)))
+        self._bms.pipe(
+            ops.filter(lambda x: x[0] != 0),
+        ).subscribe(lambda x: hass.create_task(self._bms_updated(*x)))
 
         self.dc_in_current_config = self.received.pipe(
             ops.filter(receive.is_dc_in_current_config),
@@ -204,9 +203,21 @@ class EcoFlowMainDevice(EcoFlowDevice):
                 config_entry_id=entry.entry_id,
                 **self.device_info,
             )
-            if self.serial_extra and not ef.has_extra(self.product, data.get("model", None)):
+            if self.serial_extra and ef.has_extra(self.product, data.get("model", None)) is False:
+                for serial in self.serial_extra.values():
+                    device: EcoFlowExtraDevice = self.data.devices.get(
+                        serial, None)
+                    if not device or device.parent is not self:
+                        continue
+                    de = self._dr.async_get_or_create(
+                        config_entry_id=self.entry_id,
+                        identifiers={(DOMAIN, serial)},
+                    )
+                    self._dr.async_update_device(
+                        de.id,
+                        via_device_id=None,
+                    )
                 self._clear_extra()
-                self.disconnected.on_next(1)  # deprecated
         self.pd.subscribe(pd_updated)
 
         def bms_updated(data: tuple[int, dict[str, Any]]):
@@ -253,14 +264,10 @@ class EcoFlowMainDevice(EcoFlowDevice):
         if idx not in self.serial_extra:
             async with self.sem_extra:
                 if idx not in self.serial_extra:
-                    serial = await self.request(
-                        send.get_serial_extra(),
-                        self.received.pipe(
-                            ops.filter(receive.is_serial_extra),
-                            ops.map(lambda x: receive.parse_serial(x[3])),
-                        ),
-                    )
-                    serial = serial["serial"]
+                    if ef.is_river(self.product):
+                        serial = await self._bms_updated_river(idx, data)
+                    else:
+                        serial = await self._bms_updated_others(idx, data)
                     self.serial_extra[idx] = serial
                     if serial not in self.data.devices:
                         device = EcoFlowExtraDevice(serial, self.product)
@@ -277,6 +284,19 @@ class EcoFlowMainDevice(EcoFlowDevice):
                         via_device=device.device_info["via_device"],
                     )
         self.data.devices[self.serial_extra[idx]].bms.on_next(data)
+
+    async def _bms_updated_others(self, idx: int, data: dict[str, Any]):
+        return f"{self.serial}-{idx}"
+
+    async def _bms_updated_river(self, idx: int, data: dict[str, Any]):
+        serial = await self.request(
+            send.get_serial_extra(),
+            self.received.pipe(
+                ops.filter(receive.is_serial_extra),
+                ops.map(lambda x: receive.parse_serial(x[3])),
+            ),
+        )
+        return serial["serial"]
 
     def _clear_extra(self):
         serials = list(self.serial_extra.values())
@@ -303,7 +323,7 @@ class EcoFlowExtraDevice(EcoFlowDevice):
             identifiers={(DOMAIN, self.serial)},
             manufacturer=parent["manufacturer"],
             model=parent["model"] + " Extra Battery",
-            name=f"{ef.get_model_name(self.product)} Extra {self.serial[-6:]}",
+            name=f"{ef.get_model_name(self.product)} Extra {self.serial.split('-')[0][-6:]}",
             via_device=(DOMAIN, self.parent.serial),
         )
 
@@ -319,14 +339,11 @@ class EcoFlowBaseEntity(Entity):
     _attr_should_poll = False
     _connected = False
 
-    def __init__(self, device: EcoFlowDevice, bms_id: int | None = None):
+    def __init__(self, device: EcoFlowDevice):
         self._attr_available = False
         self._device = device
-        self._bms_id = bms_id or 0
         self._attr_device_info = device.device_info
         self._attr_unique_id = device.serial
-        if bms_id:
-            self._attr_unique_id += f"-{bms_id}"
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -335,9 +352,7 @@ class EcoFlowBaseEntity(Entity):
     def _subscribe(self, src: Observable, func: Callable):
         self.async_on_remove(src.subscribe(func).dispose)
 
-    def __on_disconnected(self, bms_id: int | None):
-        if bms_id is not None and self._bms_id != bms_id:
-            return
+    def __on_disconnected(self, *args):
         self._connected = False
         if self._attr_available:
             self._attr_available = False
@@ -345,8 +360,8 @@ class EcoFlowBaseEntity(Entity):
 
 
 class EcoFlowEntity(EcoFlowBaseEntity):
-    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: int | None = None):
-        super().__init__(device, bms_id)
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str):
+        super().__init__(device)
         self._key = key
         self._src = src
         self._attr_name = name

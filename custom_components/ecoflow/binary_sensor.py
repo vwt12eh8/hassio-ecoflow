@@ -8,8 +8,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowData, EcoFlowDevice,
-               EcoFlowEntity, EcoFlowExtraDevice, EcoFlowMainDevice,
-               select_bms)
+               EcoFlowEntity, EcoFlowExtraDevice, EcoFlowMainDevice)
 from .ecoflow import is_delta, is_river
 
 
@@ -25,10 +24,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ])
             if is_delta(device.product):
                 entities.extend([
-                    ExtraErrorEntity(device, device._bms.pipe(
-                        select_bms(1)), "battery_error", "Extra1 status", 1),
-                    ExtraErrorEntity(device, device._bms.pipe(
-                        select_bms(2)), "battery_error", "Extra2 status", 2),
                     InputEntity(device, device.inverter,
                                 "ac_in_type", "AC input"),
                     InputEntity(device, device.mppt,
@@ -41,11 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     InputEntity(device, device.inverter, "in_type", "Input"),
                 ])
         elif type(device) is EcoFlowExtraDevice:
-            if is_river(device.product):
-                entities.extend([
-                    ExtraErrorEntity(device, device.bms,
-                                     "battery_error", "Status"),
-                ])
+            entities.extend([
+                ExtraErrorEntity(device, device.bms,
+                                 "battery_error", "Status"),
+            ])
         async_add_entities(entities)
 
     entry.async_on_unload(data.device_added.subscribe(device_added).dispose)

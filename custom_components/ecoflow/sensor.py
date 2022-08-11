@@ -17,7 +17,7 @@ from homeassistant.util.dt import utcnow
 from reactivex import Observable
 
 from . import (DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity,
-               EcoFlowExtraDevice, EcoFlowMainDevice, select_bms)
+               EcoFlowExtraDevice, EcoFlowMainDevice)
 from .ecoflow import is_delta, is_delta_mini, is_delta_pro, is_river
 
 
@@ -64,28 +64,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "USB-A right output"),
             ])
             if is_delta(device.product):
-                bms = (
-                    device.bms,
-                    device._bms.pipe(select_bms(1)),
-                    device._bms.pipe(select_bms(2)),
-                )
                 entities.extend([
                     CurrentEntity(device, device.mppt, "dc_in_current",
                                 "DC input current"),
                     CyclesEntity(
-                        device, bms[0], "battery_cycles", "Main battery cycles", 0),
+                        device, device.bms, "battery_cycles", "Battery cycles"),
                     LevelEntity(device, device.pd, "battery_level",
-                                "Battery level"),
+                                "Total battery level"),
                     RemainEntity(device, device.ems,
                                  "battery_remain_charge", "Remain charge"),
                     RemainEntity(device, device.ems,
                                  "battery_remain_discharge", "Remain discharge"),
                     SingleLevelEntity(
-                        device, bms[0], "battery_level_f32", "Main battery level", 0),
+                        device, device.bms, "battery_level_f32", "Battery level"),
                     TempEntity(device, device.inverter, "ac_out_temp",
                                "AC temperature"),
-                    TempEntity(device, bms[0], "battery_temp",
-                               "Main battery temperature", 0),
+                    TempEntity(device, device.bms, "battery_temp",
+                               "Battery temperature"),
                     TempEntity(device, device.mppt, "dc_in_temp",
                                "DC input temperature"),
                     TempEntity(device, device.mppt, "dc24_temp",
@@ -114,18 +109,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     ])
                 else:
                     entities.extend([
-                        CyclesEntity(
-                            device, bms[1], "battery_cycles", "Extra1 battery cycles", 1),
-                        CyclesEntity(
-                            device, bms[2], "battery_cycles", "Extra2 battery cycles", 2),
-                        SingleLevelEntity(
-                            device, bms[1], "battery_level_f32", "Extra1 battery", 1),
-                        SingleLevelEntity(
-                            device, bms[2], "battery_level_f32", "Extra2 battery", 2),
-                        TempEntity(device, bms[1], "battery_temp",
-                                   "Extra1 battery temperature", 1),
-                        TempEntity(device, bms[2], "battery_temp",
-                                   "Extra2 battery temperature", 2),
                         WattsEntity(device, device.pd, "usbqc_out1_power",
                                     "USB-Fast left output"),
                         WattsEntity(device, device.pd, "usbqc_out2_power",
@@ -172,7 +155,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                                 "USB-C output"),
                 ])
         elif type(device) is EcoFlowExtraDevice:
-            if is_river(device.product):
+            if is_delta(device.product):
+                entities.extend([
+                    CyclesEntity(
+                        device, device.bms, "battery_cycles", "Battery cycles"),
+                    SingleLevelEntity(
+                        device, device.bms, "battery_level_f32", "Battery level"),
+                    TempEntity(device, device.bms, "battery_temp",
+                               "Battery temperature"),
+                ])
+            elif is_river(device.product):
                 entities.extend([
                     CyclesEntity(device, device.bms, "battery_cycles",
                                 "Battery cycles"),
@@ -236,8 +228,8 @@ class LevelEntity(BaseEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str, bms_id: int | None = None):
-        super().__init__(device, src, key, name, bms_id)
+    def __init__(self, device: EcoFlowDevice, src: Observable[dict[str, Any]], key: str, name: str):
+        super().__init__(device, src, key, name)
         self._attr_extra_state_attributes = {}
 
 
