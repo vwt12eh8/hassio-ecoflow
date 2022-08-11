@@ -6,7 +6,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity, select_bms
+from . import (DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity,
+               EcoFlowExtraDevice, EcoFlowMainDevice)
 from .ecoflow import is_delta, is_river, is_river_mini, send
 
 
@@ -14,36 +15,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities = [
-            AcEntity(device, device.inverter, "ac_out_state", "AC output"),
-            BeepEntity(device, device.pd, "beep", "Beep"),
-        ]
-        if is_delta(device.product):
+        entities = []
+        if type(device) is EcoFlowMainDevice:
             entities.extend([
-                AcPauseEntity(device, device.inverter,
-                              "ac_in_pause", "AC charge"),
-                DcEntity(device, device.mppt, "car_out_state", "DC output"),
-                LcdAutoEntity(device, device.pd, "lcd_brightness",
-                              "Screen brightness auto"),
+                AcEntity(device, device.inverter, "ac_out_state", "AC output"),
+                BeepEntity(device, device.pd, "beep", "Beep"),
             ])
-        if is_river(device.product):
-            entities.extend([
-                AcSlowChargeEntity(device, device.inverter,
-                                   "ac_in_slow", "AC slow charging"),
-                DcEntity(device, device.pd, "car_out_state", "DC output"),
-                FanAutoEntity(device, device.inverter,
-                              "fan_config", "Auto fan speed"),
-            ])
+            if is_delta(device.product):
+                entities.extend([
+                    AcPauseEntity(device, device.inverter,
+                                "ac_in_pause", "AC charge"),
+                    DcEntity(device, device.mppt,
+                             "car_out_state", "DC output"),
+                    LcdAutoEntity(device, device.pd, "lcd_brightness",
+                                  "Screen brightness auto"),
+                ])
+            if is_river(device.product):
+                entities.extend([
+                    AcSlowChargeEntity(device, device.inverter,
+                                       "ac_in_slow", "AC slow charging"),
+                    DcEntity(device, device.pd, "car_out_state", "DC output"),
+                    FanAutoEntity(device, device.inverter,
+                                  "fan_config", "Auto fan speed"),
+                ])
+            if not is_river_mini(device.product):
+                entities.extend([
+                    XBoostEntity(device, device.inverter,
+                                "ac_out_xboost", "AC X-Boost"),
+                ])
+        elif type(device) is EcoFlowExtraDevice:
             if device.product == 5:  # RIVER Max
                 entities.extend([
-                    AmbientSyncEntity(device, device.bms.pipe(
-                        select_bms(1)), "ambient_mode", "Ambient light sync screen", 1)
+                    AmbientSyncEntity(
+                        device, device._bms, "ambient_mode", "Ambient light sync screen"),
                 ])
-        if not is_river_mini(device.product):
-            entities.extend([
-                XBoostEntity(device, device.inverter,
-                             "ac_out_xboost", "AC X-Boost"),
-            ])
         async_add_entities(entities)
 
     entry.async_on_unload(data.device_added.subscribe(device_added).dispose)

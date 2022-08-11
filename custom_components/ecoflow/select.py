@@ -8,7 +8,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice,
-               EcoFlowEntity)
+               EcoFlowEntity, EcoFlowMainDevice)
 from .ecoflow import is_delta, is_river, send
 
 _AC_OPTIONS = {
@@ -60,6 +60,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
+        if type(device) is not EcoFlowMainDevice:
+            return
         entities = [
             AcTimeoutEntity(device, device.inverter,
                             "ac_out_timeout", "AC timeout"),
@@ -104,7 +106,7 @@ class DcInTypeEntity(SelectEntity, EcoFlowConfigEntity):
     _attr_current_option = None
     _attr_options = list(_DC_IMPUTS.keys())
 
-    def __init__(self, device: EcoFlowDevice):
+    def __init__(self, device: EcoFlowMainDevice):
         super().__init__(device, "dc_in_type_config", "DC mode")
         self._req = send.get_dc_in_type(device.product)
 

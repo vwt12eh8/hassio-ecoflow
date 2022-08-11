@@ -8,7 +8,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice,
-               EcoFlowEntity)
+               EcoFlowEntity, EcoFlowMainDevice)
 from .ecoflow import is_delta, is_delta_max, is_delta_mini, is_delta_pro, send
 
 
@@ -16,6 +16,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
+        if type(device) is not EcoFlowMainDevice:
+            return
         entities = [
             DcInCurrentEntity(device, "dc_in_current_config",
                               "Car input"),

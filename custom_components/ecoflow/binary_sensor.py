@@ -1,6 +1,5 @@
 from typing import Any
 
-import reactivex.operators as ops
 from homeassistant.components.binary_sensor import (BinarySensorDeviceClass,
                                                     BinarySensorEntity)
 from homeassistant.config_entries import ConfigEntry
@@ -9,7 +8,8 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowData, EcoFlowDevice,
-               EcoFlowEntity, select_bms)
+               EcoFlowEntity, EcoFlowExtraDevice, EcoFlowMainDevice,
+               select_bms)
 from .ecoflow import is_delta, is_river
 
 
@@ -17,27 +17,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     data: EcoFlowData = hass.data[DOMAIN]
 
     def device_added(device: EcoFlowDevice):
-        entities = [
-            ChargingEntity(device),
-            MainErrorEntity(device),
-        ]
-        if is_delta(device.product):
+        entities = []
+        if type(device) is EcoFlowMainDevice:
             entities.extend([
-                ExtraErrorEntity(device, device.bms.pipe(select_bms(
-                    1), ops.share()), "battery_error", "Extra1 status", 1),
-                ExtraErrorEntity(device, device.bms.pipe(select_bms(
-                    2), ops.share()), "battery_error", "Extra2 status", 2),
-                InputEntity(device, device.inverter, "ac_in_type", "AC input"),
-                InputEntity(device, device.mppt, "dc_in_state", "DC input"),
-                CustomChargeEntity(device, device.inverter,
-                                   "ac_in_limit_switch", "AC custom charge speed"),
+                ChargingEntity(device),
+                MainErrorEntity(device),
             ])
-        if is_river(device.product):
-            entities.extend([
-                ExtraErrorEntity(device, device.bms.pipe(select_bms(
-                    1), ops.share()), "battery_error", "Extra status", 1),
-                InputEntity(device, device.inverter, "in_type", "Input"),
-            ])
+            if is_delta(device.product):
+                entities.extend([
+                    ExtraErrorEntity(device, device._bms.pipe(
+                        select_bms(1)), "battery_error", "Extra1 status", 1),
+                    ExtraErrorEntity(device, device._bms.pipe(
+                        select_bms(2)), "battery_error", "Extra2 status", 2),
+                    InputEntity(device, device.inverter,
+                                "ac_in_type", "AC input"),
+                    InputEntity(device, device.mppt,
+                                "dc_in_state", "DC input"),
+                    CustomChargeEntity(device, device.inverter,
+                                       "ac_in_limit_switch", "AC custom charge speed"),
+                ])
+            elif is_river(device.product):
+                entities.extend([
+                    InputEntity(device, device.inverter, "in_type", "Input"),
+                ])
+        elif type(device) is EcoFlowExtraDevice:
+            if is_river(device.product):
+                entities.extend([
+                    ExtraErrorEntity(device, device.bms,
+                                     "battery_error", "Status"),
+                ])
         async_add_entities(entities)
 
     entry.async_on_unload(data.device_added.subscribe(device_added).dispose)
@@ -57,7 +65,7 @@ class ChargingEntity(BinarySensorEntity, EcoFlowBaseEntity):
     _in_power = None
     _out_power = None
 
-    def __init__(self, device: EcoFlowDevice):
+    def __init__(self, device: EcoFlowMainDevice):
         super().__init__(device)
         self._attr_name = "Charging"
         self._attr_unique_id += "-in-charging"
@@ -110,9 +118,9 @@ class ExtraErrorEntity(BaseEntity):
 class MainErrorEntity(BinarySensorEntity, EcoFlowBaseEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
-    def __init__(self, device: EcoFlowDevice):
+    def __init__(self, device: EcoFlowMainDevice):
         super().__init__(device)
-        self._attr_name = "Main status"
+        self._attr_name = "Status"
         self._attr_unique_id += "-error"
         self._attr_extra_state_attributes = {}
 

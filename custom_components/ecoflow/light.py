@@ -7,7 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity, select_bms
+from . import (DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity,
+               EcoFlowExtraDevice, EcoFlowMainDevice)
 from .ecoflow import is_river, send
 
 _EFFECTS = ["Low", "High", "SOS"]
@@ -18,14 +19,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     def device_added(device: EcoFlowDevice):
         entities = []
-        if is_river(device.product):
-            entities.extend([
-                LedEntity(device, device.pd, "light_state", "Light"),
-            ])
+        if type(device) is EcoFlowMainDevice:
+            if is_river(device.product):
+                entities.extend([
+                    LedEntity(device, device.pd, "light_state", "Light"),
+                ])
+        elif type(device) is EcoFlowExtraDevice:
             if device.product == 5:  # RIVER Max
                 entities.extend([
-                    AmbientEntity(device, device.bms.pipe(
-                        select_bms(1)), "ambient", "Ambient light", 1),
+                    AmbientEntity(device, device.bms,
+                                  "ambient", "Ambient light"),
                 ])
         async_add_entities(entities)
 
