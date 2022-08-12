@@ -319,11 +319,16 @@ class EcoFlowExtraDevice(EcoFlowDevice):
     @property
     def device_info(self):
         parent = self.parent.device_info
+        name = ef.get_model_name(self.product)
+        if "-" in self.serial:
+            name += f" {self.parent.serial[-6:]} Extra"
+        else:
+            name += f" Extra {self.serial[-6:]}"
         return DeviceInfo(
             identifiers={(DOMAIN, self.serial)},
             manufacturer=parent["manufacturer"],
             model=parent["model"] + " Extra Battery",
-            name=f"{ef.get_model_name(self.product)} Extra {self.serial.split('-')[0][-6:]}",
+            name=name,
             via_device=(DOMAIN, self.parent.serial),
         )
 
