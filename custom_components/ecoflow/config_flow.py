@@ -28,7 +28,7 @@ class EcoflowConfigFlow(ConfigFlow, domain=DOMAIN):
         finally:
             tcp.close()
         if info["product"] not in PRODUCTS:
-            return self.async_abort(reason="product_unsupported")
+            return self.async_abort(reason="product_unsupported", description_placeholders={"product": info["product"]})
         await self.async_set_unique_id(info["serial"])
         self._abort_if_unique_id_configured(updates={
             CONF_HOST: self.host,
