@@ -2,7 +2,7 @@
   "title": "EcoFlow",
   "config": {
     "abort": {
-      "product_unsupported": "現時点では、この製品はサポートされていません。"
+      "product_unsupported": "現時点では、この製品はサポートされていません。\n(プロダクトタイプ：{product})"
     },
     "error": {
       "timeout": "接続がタイムアウトしました"
