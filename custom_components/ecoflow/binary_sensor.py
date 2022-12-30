@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowBaseEntity, EcoFlowData, EcoFlowDevice,
                EcoFlowEntity, EcoFlowExtraDevice, EcoFlowMainDevice)
-from .ecoflow import is_delta, is_river
+from .ecoflow import is_delta, is_river, is_river_mini
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
@@ -32,6 +32,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                                        "ac_in_limit_switch", "AC custom charge speed"),
                 ])
             elif is_river(device.product):
+                entities.extend([
+                    InputEntity(device, device.inverter, "in_type", "Input"),
+                ])
+            elif is_river_mini(device.product):
                 entities.extend([
                     InputEntity(device, device.inverter, "in_type", "Input"),
                 ])

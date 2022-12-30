@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice,
                EcoFlowEntity, EcoFlowMainDevice)
-from .ecoflow import is_delta, is_delta_max, is_delta_mini, is_delta_pro, send
+from .ecoflow import is_delta, is_delta_max, is_delta_mini, is_delta_pro, is_river_mini, send
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
@@ -21,9 +21,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entities = [
             DcInCurrentEntity(device, "dc_in_current_config",
                               "Car input"),
-            MaxLevelEntity(device, device.ems,
-                           "battery_level_max", "Charge level"),
         ]
+        if not is_river_mini(device.product):
+            entities.extend([
+                MaxLevelEntity(device, device.ems,
+                           "battery_level_max", "Charge level"),
+            ])
         if is_delta(device.product):
             entities.extend([
                 ChargeWattsEntity(device, device.inverter,
@@ -40,6 +43,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     GenerateStopEntity(
                         device, device.ems, "generator_level_stop", "Smart generator auto off"),
                 ])
+        if is_river_mini(device.product):
+            entities.extend([
+                MaxLevelEntity(device, device.inverter,
+                           "battery_level_max", "Charge level"),
+            ])
         async_add_entities(entities)
 
     entry.async_on_unload(data.device_added.subscribe(device_added).dispose)

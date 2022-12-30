@@ -9,10 +9,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (DOMAIN, EcoFlowConfigEntity, EcoFlowData, EcoFlowDevice,
                EcoFlowEntity, EcoFlowMainDevice)
-from .ecoflow import is_delta, is_river, send
+from .ecoflow import is_delta, is_river, is_river_mini, send
 
 _AC_OPTIONS = {
     "Never": 0,
+    "30min": 30,
     "2hour": 120,
     "4hour": 240,
     "6hour": 360,
@@ -79,6 +80,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entities.extend([
                 DcInTypeEntity(device),
                 LcdTimeoutPollEntity(device, "lcd_timeout", "Screen timeout"),
+            ])
+        if is_river_mini(device.product):
+            entities.extend([
+                LcdTimeoutPushEntity(device, device.pd,
+                                     "lcd_timeout", "Screen timeout"),
             ])
         async_add_entities(entities)
 

@@ -18,7 +18,7 @@ from reactivex import Observable
 
 from . import (DOMAIN, EcoFlowData, EcoFlowDevice, EcoFlowEntity,
                EcoFlowExtraDevice, EcoFlowMainDevice)
-from .ecoflow import is_delta, is_delta_mini, is_delta_pro, is_river
+from .ecoflow import is_delta, is_delta_mini, is_delta_pro, is_river, is_river_mini
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
@@ -58,11 +58,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "ac_consumption", "AC output + loss", real=True),
                 WattsEntity(device, device.inverter, "ac_out_power",
                             "AC output", real=False),
-                WattsEntity(device, device.pd, "usb_out1_power",
-                            "USB-A left output"),
-                WattsEntity(device, device.pd, "usb_out2_power",
-                            "USB-A right output"),
             ])
+            if not is_river_mini(device.product):
+                entities.extend([
+                    WattsEntity(device, device.pd, "usb_out1_power",
+                                "USB-A left output"),
+                    WattsEntity(device, device.pd, "usb_out2_power",
+                                "USB-A right output"),
+                ])
             if is_delta(device.product):
                 entities.extend([
                     CurrentEntity(device, device.mppt, "dc_in_current",
@@ -154,6 +157,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     WattsEntity(device, device.pd, "typec_out1_power",
                                 "USB-C output"),
                 ])
+            if is_river_mini(device.product):
+                entities.extend([
+                        CurrentEntity(device, device.inverter, "dc_in_current",
+                                    "DC input current"),
+                        CyclesEntity(device, device.inverter, "battery_cycles",
+                                 "Battery cycles"),
+                        LevelEntity(device, device.pd, "battery_level",
+                                    "Total battery level"),
+                        TempEntity(device, device.inverter, "ac_in_temp",
+                                   "AC input temperature"),
+                        TempEntity(device, device.inverter, "ac_out_temp",
+                                   "AC output temperature"),
+                        TempEntity(device, device.inverter, "battery_main_temp",
+                                   "Battery temperature"),
+                        TempEntity(device, device.pd, "car_out_temp",
+                                   "Car output temperature"),
+                        VoltageEntity(device, device.inverter, "dc_in_voltage",
+                                      "Car input voltage"),
+                        WattsEntity(device, device.pd, "usb_out1_power",
+                                "USB-A output"),
+                        WattsEntity(device, device.pd,
+                                    "car_out_power", "Car output"),
+                        VoltageEntity(device, device.inverter, "battery_main_voltage",
+                                    "Battery voltage"),
+                    ])
         elif type(device) is EcoFlowExtraDevice:
             if is_delta(device.product):
                 entities.extend([

@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable, TypedDict, cast
 
 from reactivex import Observable, Observer
 
-from . import calcCrc8, calcCrc16, is_delta, is_river
+from . import calcCrc8, calcCrc16, is_delta, is_river, is_river_mini
 
 
 class Serial(TypedDict):
@@ -69,6 +69,8 @@ def _to_float(d: bytes) -> float:
 def _to_int(d: bytes):
     return int.from_bytes(d, "little")
 
+def _to_hex_debug(d: bytes):
+    return " ".join("0x{:02x}".format(x) for x in d)
 
 def _to_int_ex(div: int = 1):
     def f(d: bytes):
@@ -229,8 +231,6 @@ def parse_ems(d: bytes, product: int):
         return parse_ems_delta(d)
     if is_river(product):
         return parse_ems_river(d)
-    # if is_river_mini(product):
-    #     return parse_ems_river_mini(d)
     return {}
 
 
@@ -287,9 +287,6 @@ def parse_ems_river(d: bytes):
     ])
 
 
-# def parse_ems_river_mini(d: bytes):
-#     pass
-
 def parse_fan_auto(d: bytes):
     return d[0] == 1
 
@@ -299,8 +296,8 @@ def parse_inverter(d: bytes, product: int):
         return parse_inverter_delta(d)
     if is_river(product):
         return parse_inverter_river(d)
-    # if is_river_mini(product):
-    #     return parse_pd_river_mini(d)
+    if is_river_mini(product):
+        return parse_inverter_river_mini(d)
     return {}
 
 
@@ -364,6 +361,43 @@ def parse_inverter_river(d: bytes):
         ("fan_config", 1, _to_int),
     ])
 
+def parse_inverter_river_mini(d: bytes):
+    return _parse_dict(d, [
+        ("ac_error", 4, _to_int),
+        ("ac_version", 4, _to_ver_reversed),
+        ("in_type", 1, _to_int),
+        ("in_power", 2, _to_int),
+        ("ac_out_power", 2, _to_int),
+        ("ac_type", 1, _to_int),
+        ("ac_out_voltage", 4, _to_int_ex(div=1000)),
+        ("ac_out_current", 4, _to_int_ex(div=1000)),
+        ("ac_out_freq", 1, _to_int),
+        ("ac_in_voltage", 4, _to_int_ex(div=1000)),
+        ("ac_in_current", 4, _to_int_ex(div=1000)),
+        ("ac_in_freq", 1, _to_int),
+        ("ac_out_temp", 1, _to_int),
+        ("dc_in_voltage", 4, _to_int_ex(div=1000)),
+        ("dc_in_current", 4, _to_int_ex(div=1000)),
+        ("ac_in_temp", 1, _to_int),
+        ("fan_state", 1, _to_int),
+        ("ac_out_state", 1, _to_int),
+        ("ac_out_xboost", 1, _to_int),
+        ("ac_out_voltage_config", 4, _to_int_ex(div=1000)),
+        ("ac_out_freq_config", 1, _to_int),
+        ("ac_in_slow", 1, _to_int),
+        ("battery_main_level", 1, _to_int),
+        ("battery_main_voltage", 4, _to_int_ex(div=1000)),
+        ("battery_current", 4, _to_int),
+        ("battery_main_temp", 1, _to_int),
+        ("_open_bms_idx", 1, _to_int),
+        ("battery_capacity_remain", 4, _to_int),
+        ("battery_capacity_full", 4, _to_int),
+        ("battery_cycles", 4, _to_int),
+        ("battery_level_max", 1, _to_int),
+        ("battery_main_level_f32", 4, _to_float),
+        ("ac_out_timeout", 2, _to_int),
+    ])
+
 
 def parse_lcd_timeout(d: bytes):
     return int.from_bytes(d[1:3], "little")
@@ -412,8 +446,8 @@ def parse_pd(d: bytes, product: int):
         return parse_pd_delta(d)
     if is_river(product):
         return parse_pd_river(d)
-    # if is_river_mini(product):
-    #     return parse_pd_river_mini(d)
+    if is_river_mini(product):
+        return parse_pd_river_mini(d)
     return {}
 
 
@@ -498,49 +532,47 @@ def parse_pd_river(d: bytes):
     ])
 
 
-# def parse_pd_river_mini(d: bytes):
-#     return _parse_dict(d, [
-#         ("model", 1, _to_int),
-#         ("pd_error", 4, _to_int),
-#         ("pd_version", 4, _to_ver_reversed),
-#         ("wifi_version", 4, _to_ver_reversed),
-#         ("wifi_autorecovery", 1,),
-#         ("soc_sum", 1, _to_int),
-#         ("watts_out_sum", 2, _to_int),
-#         ("watts_in_sum", 2, _to_int),
-#         ("remain_time", 4, _to_int),
-#         ("beep", 1, _to_int),
-#         ("dc_out", 1, _to_int),
-#         ("usb1_watts", 1, _to_int),
-#         ("usb2_watts", 1, _to_int),
-#         ("usbqc1_watts", 1, _to_int),
-#         ("usbqc2_watts", 1, _to_int),
-#         ("typec1_watts", 1, _to_int),
-#         ("typec2_watts", 1, _to_int),
-#         ("typec1_temp", 1, _to_int),
-#         ("typec2_temp", 1, _to_int),
-#         ("dc_out_watts", 1, _to_int),
-#         ("car_out_temp", 1, _to_int),
-#         ("standby_timeout", 2, _to_int),
-#         ("lcd_sec", 2, _to_int),
-#         ("lcd_brightness", 1, _to_int),
-#         ("chg_power_dc", 4, _to_int),
-#         ("chg_power_mppt", 4, _to_int),
-#         ("chg_power_ac", 4, _to_int),
-#         ("dsg_power_dc", 4, _to_int),
-#         ("dsg_power_ac", 4, _to_int),
-#         ("usb_used_time", 4, _to_int),
-#         ("usbqc_used_time", 4, _to_int),
-#         ("typec_used_time", 4, _to_int),
-#         ("dc_out_used_time", 4, _to_int),
-#         ("ac_out_used_time", 4, _to_int),
-#         ("dc_in_used_time", 4, _to_int),
-#         ("mppt_used_time", 4, _to_int),
-#         (None, 5, None),
-#         ("sys_chg_flag", 1, _to_int),
-#         ("wifi_rssi", 1, _to_int),
-#         ("wifi_watts", 1, _to_int),
-#     ])
+def parse_pd_river_mini(d: bytes):
+    return _parse_dict(d, [
+        ("model", 1, _to_int),
+        ("pd_error", 4, _to_int),
+        ("pd_version", 4, _to_ver_reversed),
+        ("wifi_version", 4, _to_ver_reversed),
+        ("wifi_autorecovery", 1, _to_int),
+        ("battery_level", 1, _to_int),
+        ("out_power", 2, _to_int),
+        ("in_power", 2, _to_int),
+        ("remain_display", 4, _to_timedelta_min),
+        ("beep", 1, _to_int),
+        ("usb_out1_state", 1, _to_int),
+        ("usb_out1_power", 1, _to_int),
+        ("usb2_watts", 1, _to_int),
+        ("usbqc1_watts", 1, _to_int),
+        ("usbqc2_watts", 1, _to_int),
+        ("typec1_watts", 1, _to_int),
+        ("typec2_watts", 1, _to_int),
+        ("typec1_temp", 1, _to_int),
+        ("typec2_temp", 1, _to_int),
+        ("car_out_state", 1, _to_int),
+        ("car_out_power", 1, _to_int),
+        ("car_out_temp", 1, _to_int),
+        ("standby_timeout", 1, _to_int),
+        ("unknown_1", 1, _to_hex_debug),
+        ("lcd_timeout", 2, _to_int),
+        ("lcd_brightness", 1, _to_int),
+        ("car_in_energy", 4, _to_int),
+        ("mppt_in_energy", 4, _to_int),
+        ("ac_in_energy", 4, _to_int),
+        ("dc_out_energy", 4, _to_int),
+        ("ac_out_energy", 4, _to_int),
+        ("usb_time", 4, _to_timedelta_sec),
+        ("unknown_2", 8, _to_hex_debug),
+        ("car_out_time", 4, _to_timedelta_sec),
+        ("ac_out_time", 4, _to_timedelta_sec),
+        ("car_in_time", 4, _to_timedelta_sec),
+        ("mppt_time", 4, _to_timedelta_sec),
+        ("unknown_3", 30, _to_hex_debug),
+    ])
 
 
 def parse_serial(d: bytes) -> Serial:

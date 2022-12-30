@@ -20,6 +20,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entities.extend([
                 AcEntity(device, device.inverter, "ac_out_state", "AC output"),
                 BeepEntity(device, device.pd, "beep", "Beep"),
+                XBoostEntity(device, device.inverter,
+                                "ac_out_xboost", "AC X-Boost"),
             ])
             if is_delta(device.product):
                 entities.extend([
@@ -40,8 +42,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 ])
             if not is_river_mini(device.product):
                 entities.extend([
-                    XBoostEntity(device, device.inverter,
-                                "ac_out_xboost", "AC X-Boost"),
+                    DcEntity(device, device.mppt,
+                             "car_out_state", "DC output"),
+                    FanAutoEntity(device, device.inverter,
+                        "fan_config", "Auto fan speed"),
+                ])
+            if is_river_mini(device.product):
+                entities.extend([
+                    DcEntity(device, device.pd,
+                             "car_out_state", "DC output"),
+                    UsbEntity(device, device.pd,
+                             "usb_out1_state", "USB output"),
                 ])
         elif type(device) is EcoFlowExtraDevice:
             if device.product == 5:  # RIVER Max
@@ -143,6 +154,14 @@ class DcEntity(SimpleEntity):
     async def async_turn_on(self, **kwargs: Any):
         self._device.send(send.set_dc_out(self._device.product, True))
 
+class UsbEntity(SimpleEntity):
+    _attr_device_class = SwitchDeviceClass.OUTLET
+
+    async def async_turn_off(self, **kwargs: Any):
+        self._device.send(send.set_usb(False))
+
+    async def async_turn_on(self, **kwargs: Any):
+        self._device.send(send.set_usb(True))
 
 class FanAutoEntity(SimpleEntity):
     _attr_entity_category = EntityCategory.CONFIG
