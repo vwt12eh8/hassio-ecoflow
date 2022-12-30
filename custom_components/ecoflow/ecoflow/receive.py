@@ -231,8 +231,6 @@ def parse_ems(d: bytes, product: int):
         return parse_ems_delta(d)
     if is_river(product):
         return parse_ems_river(d)
-    # if is_river_mini(product):
-    #     return parse_ems_river_mini(d)
     return {}
 
 
@@ -288,9 +286,6 @@ def parse_ems_river(d: bytes):
         ("_tag_chg_amp", 4, _to_int),
     ])
 
-
-# def parse_ems_river_mini(d: bytes):
-#     pass
 
 def parse_fan_auto(d: bytes):
     return d[0] == 1
