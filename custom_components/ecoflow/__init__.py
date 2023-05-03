@@ -426,7 +426,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         return False
 
     hass.data[DOMAIN] = EcoFlowData()
-    hass.config_entries.async_setup_platforms(entry, _PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_entry_updated))
     entry.async_create_task(hass, _entry_updated(hass, entry))
