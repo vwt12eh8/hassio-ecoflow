@@ -337,6 +337,9 @@ class EcoFlowExtraDevice(EcoFlowDevice):
 
     def send(self, data: bytes):
         return self.parent.send(data)
+        
+    def close():
+        pass
 
 
 class EcoFlowBaseEntity(Entity):
